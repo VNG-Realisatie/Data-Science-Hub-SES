@@ -7,7 +7,7 @@ Het primaire doel van de pilot is om zicht te krijgen op de beïnvloedbare facto
 
 
 
-Roadmap Positieve Gezondheid 'Geond en gelukkig oud worden', werkgroep SES
+Roadmap Positieve Gezondheid 'Gezond en gelukkig oud worden', werkgroep SES
 
 Deelnemers: Uden, Brummen, Westland, Roosendaal, GGD Hart van Brabant en het Data Science Hub
 
