@@ -13,4 +13,4 @@ Deelnemers: Uden, Brummen, Westland, GGD Hart voor Brabant en het Data Science H
 
 Databestand: GGD Geondheidsmonitor Hart voor Brabant
 
-Contact Mark Gremmen @ Data Science Hub (mark.gremmen AT vng.nl) 
+Contact Mark Gremmen: mark.gremmen AT vng.nl of @MarkGremmen 
