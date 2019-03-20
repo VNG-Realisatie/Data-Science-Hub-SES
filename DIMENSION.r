@@ -4,7 +4,7 @@
 # imputation, outlier analysis, dimension reduction, clustering, plotting
 # author : Mark Henry Gremmen
 # DataScienceHub @ JADS
-# lud 2019-03-17
+# lud 2019-03-20
 #-------------------------------------------------------------------------------
 # Libraries
 
@@ -25,10 +25,10 @@ sessionInfo()
 root <- getwd()
 root
 
-#set graphs location
+#set graphs location (create directory first)
 plots.loc <- paste0(root,'/PLOTS/')
 
-#set data location
+#set data location (create directory first)
 data.loc <- paste0(root,'/DATA/')
 
 #functions
@@ -56,8 +56,10 @@ f <- 3
 rotation <- "none"
 
 #dimension charts
-aspect_ratio <- 2.5
 height <- 7
+graph_height <- 8
+aspect_ratio <- 2.5
+
 
 
 #-------------------------------------------------------------------------------
@@ -375,7 +377,7 @@ ggplot(d_tsne, aes(x=V1, y=V2)) +
   scale_colour_brewer(palette = "Set2")
 plot.nme = paste0('Rplot_tsne_raw_',dest.nme.var,'_k',k,'_p',perplex,'.png')
 plot.store <-paste0(plots.loc,plot.nme)
-ggsave(plot.store, height = 8 , width = 8 * aspect_ratio)
+ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio)
 
 
 ## keeping original data
@@ -436,7 +438,7 @@ ggtitle(plot.title) +
 geom_text(aes(label = ""), size = 3, vjust = 1, color = "black")
 plot.nme = paste0('Rplot_tsne_kmeans_',dest.nme.var,'_k',k,'_p',perplex,'.png')
 plot.store <-paste0(plots.loc,plot.nme)
-ggsave(plot.store, height = 8 , width = 8 * aspect_ratio)
+ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio)
 
 
 
@@ -601,59 +603,3 @@ write_sav(z, final_sav)
 
 
 
-
-
-
-
-
-
-
-
-
-#-------------------------------------------------------------------------------
-# reporting
-
-
-y <- z
-cols2 <- c("weegfactor3","GGEES203","cl_kmeans")
-y <- y[,cols2]
-
-
-y$weegfactor3 <-as.numeric(y$weegfactor3)
-y$GGEES203 <- as.numeric(y$GGEES203)
-
-
-gd <- y %>% 
-  group_by(cl_kmeans) %>% 
-       summarise(eenzaamheid_avg = weighted.mean(GGEES203,weegfactor3,na.rm = TRUE))
-
-
-#eenzaamheid * cluster
-ggplot(data=gd, aes(x=cl_kmeans, y=eenzaamheid_avg), fill = as.factor(cl_kmeans)) +
-  geom_bar(col="red", 
-           fill="green", 
-           alpha = .2,position = "dodge", stat = "summary", fun.y = "mean") +
-  guides(fill=FALSE)  + 
-  labs(title=paste0("Clusters * eenzaamheid of " , dest.nme.var , " k=",k)) +
-  labs(x="cluster", y="avg(eenzaamheid)") + 
-  scale_x_discrete(name ="cluster", limits=c(1:k))
-
-plot.nme = paste0('Rplot_clusters_eenzaamheid_',dest.nme.var,'_k',k,'_p',perplex,'.png')
-plot.store <-paste0(plots.loc,plot.nme)
-ggsave(plot.store, height = 8 , width = 8 * aspect_ratio)
-
-plot.store
-
-
-
-
-
-
-
-
-library(tmap)
-data("NLD_prov")
-
-tmap_mode('view')
-
-tm_shape(NLD_prov) + tm_polygons('population') + tm_layout(basemaps = c('OpenStreetMap'))
