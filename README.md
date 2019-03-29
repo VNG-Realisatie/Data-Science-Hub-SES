@@ -9,7 +9,7 @@ Het primaire doel van de pilot is om zicht te krijgen op de beïnvloedbare facto
 
 Roadmap Positieve Gezondheid 'Gezond en gelukkig oud worden', werkgroep SES
 
-Deelnemers: Uden, Brummen, Westland, GGD Hart voor Brabant en het Data Science Hub
+Deelnemers: gemeente Uden, Brummen, Westland, GGD Hart voor Brabant en het Data Science Hub
 
 Databestand: GGD Gezondheidsmonitor Hart voor Brabant
 
