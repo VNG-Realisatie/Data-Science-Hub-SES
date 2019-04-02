@@ -21,7 +21,7 @@ lapply(packages,library,character.only = TRUE)
 sessionInfo()
 
 #-------------------------------------------------------------------------------
-# Global settings
+# Global settings (change if/where needed)
 
 #root location of this procedure (working directory)
 root <- getwd()
@@ -50,7 +50,7 @@ k <- 7
 #value between 30 and 50 is usually fine
 perplex <- 40
 
-#number of factors
+#number of factors (PCA)
 f <- 3
 
 #rotation (PCA)
@@ -87,23 +87,23 @@ SOURCE_RAW <- as.data.frame(SOURCE_RAW)
 dim(SOURCE_RAW)
 #meta-data
 #str(SOURCE_RAW)
-#head(SOURCE_RAW)
+#head(SOURCE_RAW,2)
 
 
 #-------------------------------------------------------------------------------
 #PRE-PREPARE
 
-#new recoded variables
+#create new recoded variables
 #ervarengezondheid_dich 1 '(zeer) slecht' 0 'matig tot (zeer) goed)'
-SOURCE_RAW$ervarengezondheid_dich = recode(SOURCE_RAW$KLGGA207, "3=1; 1=0; 2=0")
+SOURCE_RAW$ervarengezondheid_dich = recode(SOURCE_RAW$KLGGA207, "3=1; 1=0; 2=0; 9=NA")
 
 #regie_dich 1 'onvoldoende regie' 0 'matig of veel regie'
-SOURCE_RAW$regie_dich = recode(SOURCE_RAW$GGRLS203, "0=1; 1=0")
+SOURCE_RAW$regie_dich = recode(SOURCE_RAW$GGRLS203, "0=1; 1=0; 9=NA")
 
 #eenzaamheid_dich 1 '(zeer) ernstig eenzaam' 0 'niet of matig eenzaam'
 SOURCE_RAW$eenzaamheid_dich = recode(SOURCE_RAW$GGEES209, "1=1; 0=0; 8=0")
 
-#dagactiviteit 'betaald werk, vrijwilligerswerk, student'
+#dagactiviteit 'betaald werk, vrijwilligerswerk, student' (zinvolle dagbesteding)
 SOURCE_RAW$dagactiviteit <- 0
 SOURCE_RAW$dagactiviteit[SOURCE_RAW$MMWSA205==9 & SOURCE_RAW$MMVWB201==9 & SOURCE_RAW$MMWSA211==9] <- NA
 SOURCE_RAW$dagactiviteit[SOURCE_RAW$MMWSA205==1 | SOURCE_RAW$MMVWB201==1 | SOURCE_RAW$MMWSA211==1] <- 1
@@ -126,6 +126,18 @@ SOURCE_RAW$leeftijdcat6 = recode(SOURCE_RAW$Lftklassen, "1=1; 2:4=2; 5:7=3; 8:9=
 
 #-------------------------------------------------------------------------------
 
+#set respondent id variable
+SOURCE_RAW$respondent_id <- SOURCE_RAW$volgnummer 
+as.factor(SOURCE_RAW$respondent_id)
+
+#attach respondent id to index of dataframe
+has_rownames(SOURCE_RAW)
+SOURCE_RAW <- remove_rownames(SOURCE_RAW)
+SOURCE_RAW <- column_to_rownames(SOURCE_RAW, var = "respondent_id")
+
+SOURCE_RAW$respondent_id <- SOURCE_RAW$volgnummer 
+as.factor(SOURCE_RAW$respondent_id)
+
 #save enriched source as Rdata set
 srce.nme <- file_path_sans_ext(basename(srce.loc))
 save(SOURCE_RAW,file=paste0(data.loc,srce.nme,".Rda"))
@@ -136,18 +148,6 @@ SOURCE = get(x)
 #remove redundant datasets
 rm(x)
 rm(SOURCE_RAW)
-
-#set respondent id variable
-SOURCE$respondent_id <- SOURCE$volgnummer 
-as.factor(SOURCE$respondent_id)
-
-#attach respondent id to index of dataframe
-has_rownames(SOURCE)
-SOURCE <- remove_rownames(SOURCE)
-SOURCE <- column_to_rownames(SOURCE, var = "respondent_id")
-
-SOURCE$respondent_id <- SOURCE$volgnummer 
-as.factor(SOURCE$respondent_id)
 
 #GEO data (was supplied seperately) by GGD Hart van Brabant
 geo.loc <- paste0(data.loc,"GGD-MONITOR-2016-GEO.sav")
@@ -225,7 +225,7 @@ SOURCE_SUBSET <- SOURCE_SUBSET[ which(SOURCE_SUBSET$eenzaamheid_dich==1
 SOURCE_SUBSET <- subset(SOURCE_SUBSET, select = -c(eenzaamheid_dich,regie_dich,GGADS201))
 
 
-#Recoding -where needed- into new dichitomous variable with the same direction of the loadings
+#Recoding -where needed- into new dichotomous variable with the same direction of the loadings
 SOURCE_SUBSET$dagactiviteit_dich = recode(SOURCE_SUBSET$dagactiviteit, "1=0; 0=1;")
 
 SOURCE_SUBSET$MMIKB201_dich = recode(SOURCE_SUBSET$MMIKB201, "4=1; 3=0; 2=0; 1=0")
@@ -360,7 +360,7 @@ SOURCE_SUBSET$MD <- round(m_dist, 1)
 
 #head(SOURCE_SUBSET,2)
 
-# Binary Outlier Variable
+# Outlier Variable
 SOURCE_SUBSET$outlier <- "No"
 SOURCE_SUBSET$outlier[SOURCE_SUBSET$MD > 19.9] <- "Yes"    # Threshold set to 20
 #subset of regular/non-outlier cases
@@ -433,10 +433,14 @@ tsne_original=d_tsne
 #-------------------------------------------------------------------------------
 # Clustering tendency
 
-ct <- dist(d_tsne)
-VAT(ct)
-iVAT(ct)
 
+#Hopkins statistic: If the value of Hopkins statistic is close to zero (far below 0.5), then we can conclude that the dataset is significantly clusterable. 
+
+#gradient_col = list(low = "steelblue", high = "white")
+#get_clust_tendency(d_tsne, n = 50, gradient = gradient_col)
+
+#res <- get_clust_tendency(SOURCE_SUBSET, n = nrow(SOURCE_SUBSET)-1, graph = FALSE)
+#res$hopkins_stat
 
 #-------------------------------------------------------------------------------
 # Optimal number of clusters
@@ -457,7 +461,11 @@ fviz_nbclust(d_tsne, FUNcluster=CusKmeansFUN, method="gap_stat")
 ## Creating k-means clustering model, and assigning the result to the data used to create the tsne
 fit_cluster_kmeans=kmeans(scale(d_tsne), k,iter.max = 1000,algorithm = c("Forgy"))  
 
-str(fit_cluster_kmeans)
+
+
+fviz_cluster(list(data = SOURCE_SUBSET, cluster = fit_cluster_kmeans$cluster),
+             ellipse.type = "norm", geom = "point", stand = FALSE,
+             palette = "jco", ggtheme = theme_classic())
 
 #cluster membership distribution
 fit_cluster_kmeans$size	
@@ -475,8 +483,7 @@ tsne_original <- rename(tsne_original,pos_x=V1,pos_y=V2)
 head(tsne_original,2)
 
 
-
-
+## plotting the results with Kmeans clustering
 plot.title = paste0('TSNE > Kmeans of ',dest.nme.var, ' k=',k,' perplexity=',perplex)
 ggplot(tsne_original, aes(pos_x, pos_y, color = cl_kmeans)) +
         geom_point()   + 
@@ -489,10 +496,7 @@ ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio)
 
 
 
-
-
 # I.2.2 TSNE (DR) > K-medoids clustering or PAM
-library("cluster")
 pam_res <- pam(d_tsne, k)
 
 pam_clus <- as.data.frame(pam_res$clustering)
