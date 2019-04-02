@@ -1,19 +1,21 @@
-
 #-------------------------------------------------------------------------------
 # Roadmap Positive Health
 # imputation, outlier analysis, dimension reduction, clustering, plotting
 # author : Mark Henry Gremmen
 # DataScienceHub @ JADS
-# lud 2019-03-20
+# lud 2019-04-01
 #-------------------------------------------------------------------------------
 # Libraries
 
 #packages
-packages <- c("tools","here","tidyverse", "haven", "mice","VIM", "corrplot", "car", "nFactors", "psych", "caret", 
+packages <- c("tools","here","tidyverse","naniar", "haven", "mice","VIM", "corrplot", "car", "nFactors", "psych", "caret", 
               "Rtsne", "cluster","dbscan", "dendextend", "fpc", "factoextra", "rpart", "rpart.plot", 
               "ggplot2", "ggthemes", "qgraph", "gridExtra","randomForest")
-#if packages are not available on your computing set-up then remove bracket from next line, and afterwards re-instate bracket
-#install.packages(packages)
+#install packages which are not available
+has_available   <- packages %in% rownames(installed.packages())
+if(any(!has_available)) install.packages(packages[!has_available])
+
+
 lapply(packages,library,character.only = TRUE)
 #review
 sessionInfo()
@@ -87,13 +89,51 @@ dim(SOURCE_RAW)
 #str(SOURCE_RAW)
 #head(SOURCE_RAW)
 
-#save source as Rdata set
+
+#-------------------------------------------------------------------------------
+#PRE-PREPARE
+
+#new recoded variables
+#ervarengezondheid_dich 1 '(zeer) slecht' 0 'matig tot (zeer) goed)'
+SOURCE_RAW$ervarengezondheid_dich = recode(SOURCE_RAW$KLGGA207, "3=1; 1=0; 2=0")
+
+#regie_dich 1 'onvoldoende regie' 0 'matig of veel regie'
+SOURCE_RAW$regie_dich = recode(SOURCE_RAW$GGRLS203, "0=1; 1=0")
+
+#eenzaamheid_dich 1 '(zeer) ernstig eenzaam' 0 'niet of matig eenzaam'
+SOURCE_RAW$eenzaamheid_dich = recode(SOURCE_RAW$GGEES209, "1=1; 0=0; 8=0")
+
+#dagactiviteit 'betaald werk, vrijwilligerswerk, student'
+SOURCE_RAW$dagactiviteit <- 0
+SOURCE_RAW$dagactiviteit[SOURCE_RAW$MMWSA205==9 & SOURCE_RAW$MMVWB201==9 & SOURCE_RAW$MMWSA211==9] <- NA
+SOURCE_RAW$dagactiviteit[SOURCE_RAW$MMWSA205==1 | SOURCE_RAW$MMVWB201==1 | SOURCE_RAW$MMWSA211==1] <- 1
+
+#inkkwin_2016 'Gestandaardiseerd huishoudinkomen in kwintielen (numerieke variabele)'
+#inkkwin_2016 1 '0 tot 20% (max 16.100 euro)' 2 '20 tot 40% (max 21.300 euro)' 3 '40 tot 60% (max 27.200 euro)'
+#4 '60 tot 80% (max 35.100 euro)' 5 '80 tot 100% (> 35.100 euro)' 9 'onbekend'.
+
+#inkomenzeerlaag_dich 1 'zeer laag, max 16.100 euro' 0 'hoger'
+SOURCE_RAW$inkomenzeerlaag_dich = recode(SOURCE_RAW$inkkwin_2016, "1=1; 2=0; 3=0; 4=0; 5=0; 9=NA")
+
+#inkomenlaag_dich 1 'laag, max 21.300 euro' 0 'hoger'
+SOURCE_RAW$inkomenlaag_dich = recode(SOURCE_RAW$inkkwin_2016, "1=1; 2=1; 3=0; 4=0; 5=0; 9=NA")
+
+#leeftijdcat6  'leeftijd in 6 categorieen obv geboortedatum' 
+SOURCE_RAW$leeftijdcat6 = recode(SOURCE_RAW$Lftklassen, "1=1; 2:4=2; 5:7=3; 8:9=4; 10:11=5; 12:14=6; 99=NA")
+
+#IQfac <- cut(IQ, breaks=c(0, 85, 115, Inf), labels=c("lo", "mid", "hi"))
+
+
+#-------------------------------------------------------------------------------
+
+#save enriched source as Rdata set
 srce.nme <- file_path_sans_ext(basename(srce.loc))
 save(SOURCE_RAW,file=paste0(data.loc,srce.nme,".Rda"))
 x = load(paste0(data.loc,srce.nme,".Rda"))
 
 #load Rdataset (to avoid damage to original dataset)
 SOURCE = get(x)
+#remove redundant datasets
 rm(x)
 rm(SOURCE_RAW)
 
@@ -329,6 +369,7 @@ SOURCE_SUBSET <- SOURCE_SUBSET[ which(SOURCE_SUBSET$MD < 20), ]
 head(SOURCE_SUBSET,2)
 
 #remove outlier indicators
+# why?  K-means is sensitive to outliers
 SOURCE_SUBSET$MD <- NULL
 SOURCE_SUBSET$outlier <- NULL
 dim(SOURCE_SUBSET)
@@ -416,24 +457,30 @@ fviz_nbclust(d_tsne, FUNcluster=CusKmeansFUN, method="gap_stat")
 ## Creating k-means clustering model, and assigning the result to the data used to create the tsne
 fit_cluster_kmeans=kmeans(scale(d_tsne), k,iter.max = 1000,algorithm = c("Forgy"))  
 
-#barplot(t(fit_cluster_kmeans$centers), beside=TRUE, xlab="cluster", ylab="value")
+str(fit_cluster_kmeans)
 
-#fit_cluster_kmeans$cluster
-#fit_cluster_kmeans$centers
+#cluster membership distribution
 fit_cluster_kmeans$size	
 
-
+#cluster membership
+#fit_cluster_kmeans$cluster
 fit_cluster_kmeans$cluster <- factor(fit_cluster_kmeans$cluster)
 
-tsne_original$cl_kmeans = factor(fit_cluster_kmeans$cluster)
+#add clustermemberschip to Tsne dataframe
+tsne_original$cl_kmeans <- fit_cluster_kmeans$cluster
+
 tsne_original$cl_kmeans <- as.factor(tsne_original$cl_kmeans)
 tsne_original <- rename(tsne_original,pos_x=V1,pos_y=V2)
 
 head(tsne_original,2)
 
+
+
+
 plot.title = paste0('TSNE > Kmeans of ',dest.nme.var, ' k=',k,' perplexity=',perplex)
-ggplot(tsne_original, aes(pos_x, pos_y, color = cl_kmeans)) + geom_point() + 
-ggtitle(plot.title) +
+ggplot(tsne_original, aes(pos_x, pos_y, color = cl_kmeans)) +
+        geom_point()   + 
+        ggtitle(plot.title) +
 #geom_text(aes(label=row.names(X)),color="#ababab") +
 geom_text(aes(label = ""), size = 3, vjust = 1, color = "black")
 plot.nme = paste0('Rplot_tsne_kmeans_',dest.nme.var,'_k',k,'_p',perplex,'.png')
@@ -443,7 +490,21 @@ ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio)
 
 
 
-# I.2.2 TSNE (DR) > hierarchical clustering
+
+# I.2.2 TSNE (DR) > K-medoids clustering or PAM
+library("cluster")
+pam_res <- pam(d_tsne, k)
+
+pam_clus <- as.data.frame(pam_res$clustering)
+
+
+tsne_original$cl_pam = pam_clus
+
+
+
+
+
+# I.2.3 TSNE (DR) > hierarchical clustering
 ## Creating hierarchical cluster model, and assigning the result to the data used to create the tsne
 
 #We use the Euclidean distance as distance metrics, and use 
@@ -471,7 +532,6 @@ png(filename=plot.store)
 plot(dend, main = paste("TSNE > HCA of " , dest.nme.var , " k=",k,' perplexity=',perplex))
 rect.hclust(fit_hca_tsne, k = k, border = 2:4) 
 dev.off()
-
 
 class(tsne_original)
 ## setting k clusters as output
@@ -591,15 +651,10 @@ as.numeric(z$volgnummer)
 as.factor(z$volgnummer)
 
 z$zorgwekkend <- 0
-
-z$zorgwekkend = recode(z$cl_kmeans, "9=1; 8=1; 7=1; 6=1; 5=1; 4=1; 3=1; 2=1; 1=1")
+z$zorgwekkend[z$cl_kmeans>0] <- 1
 
 as.factor(z$zorgwekkend)
 
 write.csv(z, file=final_csv,row.names=FALSE)
 write_sav(z, final_sav)
-
-
-
-
 
