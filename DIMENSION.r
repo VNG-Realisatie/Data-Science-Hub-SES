@@ -3,14 +3,14 @@
 # imputation, outlier analysis, dimension reduction, clustering, plotting
 # author : Mark Henry Gremmen
 # DataScienceHub @ JADS
-# lud 2019-04-01
+# lud 2019-04-04
 #-------------------------------------------------------------------------------
 # Libraries
 
 #packages
 packages <- c("tools","here","tidyverse","naniar", "haven", "mice","VIM", "corrplot", "car", "nFactors", "psych", "caret", 
               "Rtsne", "cluster","dbscan", "dendextend", "fpc", "factoextra", "rpart", "rpart.plot", 
-              "ggplot2", "ggthemes", "qgraph", "gridExtra","randomForest")
+              "ggplot2", "ggthemes", "qgraph", "gridExtra","randomForest","tidyr")
 #install packages which are not available
 has_available   <- packages %in% rownames(installed.packages())
 if(any(!has_available)) install.packages(packages[!has_available])
@@ -40,7 +40,7 @@ if(!exists("multimerge", mode="function")) source("D://DS/RSTAT/LIB/multimerge.R
 set.seed(123)
 options(digits=3)
 
-#number of clusters (Kmeans, HCA): always (re)check the optimal number of clusters!!!
+#number of clusters (Kmeans, Hierarchical Cluster Analysis): always (re)check the optimal number of clusters!!!
 #see section II. clustering tendency
 k <- 7
 
@@ -147,7 +147,7 @@ x = load(paste0(data.loc,srce.nme,".Rda"))
 SOURCE = get(x)
 #remove redundant datasets
 rm(x)
-rm(SOURCE_RAW)
+
 
 #GEO data (was supplied seperately) by GGD Hart van Brabant
 geo.loc <- paste0(data.loc,"GGD-MONITOR-2016-GEO.sav")
@@ -215,7 +215,7 @@ rm(SOURCE)
 names(SOURCE_SUBSET)[names(SOURCE_SUBSET) == 'ervarengezondheid_dich'] <- 'gezondheidsbeleving'
   
 #select cases 
-#(potentieel) problematische gevallen op het vlak van 
+#kwetsbare of (dreigende) zorgwekkende gevallen op het vlak van 
 #eenzaam en / of zonder regie, en / of angststoornis/depressie
 SOURCE_SUBSET <- SOURCE_SUBSET[ which(SOURCE_SUBSET$eenzaamheid_dich==1
                                   | SOURCE_SUBSET$regie_dich==1 
@@ -378,7 +378,7 @@ dim(SOURCE_SUBSET)
 cols.srce.nme <- paste0(data.loc, "cols-source-merged-",dest.nme.var, ".csv")
 write.csv(SOURCE_SUBSET, file=cols.srce.nme)
 
-#Bartlettas test of sphericity (test for homogeneity of variances)
+#Bartlettas test of sphericity (test for homogeneity of variances) : To check if data reduction is possible
 bartlett.test(SOURCE_SUBSET)
 
 
@@ -461,12 +461,6 @@ fviz_nbclust(d_tsne, FUNcluster=CusKmeansFUN, method="gap_stat")
 ## Creating k-means clustering model, and assigning the result to the data used to create the tsne
 fit_cluster_kmeans=kmeans(scale(d_tsne), k,iter.max = 1000,algorithm = c("Forgy"))  
 
-
-
-fviz_cluster(list(data = SOURCE_SUBSET, cluster = fit_cluster_kmeans$cluster),
-             ellipse.type = "norm", geom = "point", stand = FALSE,
-             palette = "jco", ggtheme = theme_classic())
-
 #cluster membership distribution
 fit_cluster_kmeans$size	
 
@@ -496,14 +490,10 @@ ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio)
 
 
 
-# I.2.2 TSNE (DR) > K-medoids clustering or PAM
+# I.2.2 TSNE (DR) > K-medoids clustering or PAM (less prone to outliers)
 pam_res <- pam(d_tsne, k)
 
 pam_clus <- as.data.frame(pam_res$clustering)
-
-
-tsne_original$cl_pam = pam_clus
-
 
 
 
@@ -515,29 +505,25 @@ tsne_original$cl_pam = pam_clus
 #Ward's minimum variance method to perform agglomerative clustering.
 fit_hca_tsne=hclust(dist(scale(d_tsne), method="euclidean"), method="ward.D2")
 head(fit_hca_tsne)
-# plot dendrogram
 
-plot.nme = paste0('Rplot_tsne_hca_',dest.nme.var,'_k',k,'.png')
-plot.store <-paste0(plots.loc,plot.nme)
-png(filename=plot.store)
-plot(fit_hca_tsne, labels = FALSE, hang = -0.01, cex = 0.7,main = paste("TSNE > HCA of " , dest.nme.var , " k=",k,' perplexity=',perplex))
-rect.hclust(fit_hca_tsne, k = k, border = 2:4) 
-dev.off()
-
-
-plot.nme = paste0('Rplot_tsne_hca_color_',dest.nme.var,'_k',k,'.png')
-plot.store <-paste0(plots.loc,plot.nme)
 dend <- as.dendrogram(fit_hca_tsne)
+
 # order it the closest we can to the order of the observations:
 dend <- rotate(dend, 1:150)
 # Color the branches based on the clusters:
 dend <- color_branches(dend, k = k) 
-png(filename=plot.store)
-plot(dend, main = paste("TSNE > HCA of " , dest.nme.var , " k=",k,' perplexity=',perplex))
-rect.hclust(fit_hca_tsne, k = k, border = 2:4) 
-dev.off()
 
-class(tsne_original)
+# plot dendrogram
+plot.nme = paste0('Rplot_tsne_hca_coooolors_',dest.nme.var,'_k',k,'.png')
+png(filename=plot.store)
+plot(dend, type = "rectangle", ylab = "Height", main = paste("TSNE > HCA of " , dest.nme.var , " k=",k,' perplexity=',perplex))
+
+#plot(dend, main = paste("TSNE > HCA of " , dest.nme.var , " k=",k,' perplexity=',perplex))
+rect.hclust(fit_hca_tsne, k = k, border = 2:4) 
+
+dev.off()
+plot.store <-paste0(plots.loc,plot.nme)
+
 ## setting k clusters as output
 tsne_original$cl_hierarchical = factor(cutree(fit_hca_tsne, k=k)) 
 #as.data.frame(tsne_original)
@@ -634,7 +620,7 @@ write.csv(tsne_original_export, file=cluster_membership_name,row.names=TRUE)
 # merging and writing original data, predictors, additional dichitomized varuables,clustering
 
 u <- cbind.data.frame(SOURCE_SUBSET,tsne_original)
-z <- multimerge( list (SOURCE, u, GEO) )
+z <- multimerge( list (SOURCE_RAW, u, GEO) )
 #colnames(z) <- gsub("^_", "", colnames(z))
 
 head(z,2)
@@ -652,13 +638,52 @@ dim(z)
 
 head(z)
 as.numeric(z$volgnummer)
-as.factor(z$volgnummer)
-
-z$zorgwekkend <- 0
-z$zorgwekkend[z$cl_kmeans>0] <- 1
-
-as.factor(z$zorgwekkend)
 
 write.csv(z, file=final_csv,row.names=FALSE)
 write_sav(z, final_sav)
+
+
+
+#-------------------------------------------------------------------------------
+# TSNE > KMEANS > PCA 
+
+
+dim_var <- c("cl_kmeans","gez_slecht",  "inkomenlaag_dich", "opl_dichVM", "geenbetaaldwerk", "dagactiviteit") 
+
+#relevant variables for PCA
+q <- z[, dim_var]
+
+#all numeric values
+q[] <- lapply(q, function(x) {
+  if(is.factor(x)) as.numeric(as.character(x)) else x
+})
+
+
+q[q == 9] <- NA
+
+#delete records with missings
+q <- na.omit(q)
+
+sapply(q, function(x) sum(is.na(x)))
+
+
+#pca per cluster
+for(i in 1:k) {
+  
+  
+  v <-subset(q,cl_kmeans==i)
+ # q$cl_kmeans <- NULL
+  
+  
+  dimens_comp<- principal(v[,-which(names(v)=="cl_kmeans")], nfactors = f, residuals = FALSE,rotate="none",n.obs=NA, covar=FALSE,
+            scores=TRUE,missing=TRUE,impute="median")
+  
+  prop.table(dimens_comp$values)
+
+  dimens_comp$loadings
+  
+  
+}
+
+
 
