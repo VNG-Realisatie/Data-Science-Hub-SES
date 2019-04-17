@@ -1,9 +1,9 @@
 #-------------------------------------------------------------------------------
 # Roadmap Positive Health
-# imputation, outlier analysis, dimension reduction, clustering, plotting
+# imputation (IM), outlier analysis (OU), dimensional reduction (DR), clustering (CL), plotting
 # author : Mark Henry Gremmen
 # DataScienceHub @ JADS
-# lud 2019-04-04
+# lud 2019-04-17
 #-------------------------------------------------------------------------------
 # Libraries
 
@@ -14,7 +14,6 @@ packages <- c("tools","here","tidyverse","naniar", "haven", "mice","VIM", "corrp
 #install packages which are not available
 has_available   <- packages %in% rownames(installed.packages())
 if(any(!has_available)) install.packages(packages[!has_available])
-
 
 lapply(packages,library,character.only = TRUE)
 #review
@@ -37,7 +36,7 @@ data.loc <- paste0(root,'/DATA/')
 if(!exists("multimerge", mode="function")) source("D://DS/RSTAT/LIB/multimerge.R",local = TRUE)
 
 #options
-set.seed(123)
+set.seed(123)  # for reproducibility
 options(digits=3)
 
 #number of clusters (Kmeans, Hierarchical Cluster Analysis): always (re)check the optimal number of clusters!!!
@@ -120,6 +119,19 @@ SOURCE_RAW$inkomenlaag_dich = recode(SOURCE_RAW$inkkwin_2016, "1=1; 2=1; 3=0; 4=
 
 #leeftijdcat6  'leeftijd in 6 categorieen obv geboortedatum' 
 SOURCE_RAW$leeftijdcat6 = recode(SOURCE_RAW$Lftklassen, "1=1; 2:4=2; 5:7=3; 8:9=4; 10:11=5; 12:14=6; 99=NA")
+
+#leeftijd70eo 'leeftijd 70 jaar of ouder'
+SOURCE_RAW$leeftijd70eo = recode(SOURCE_RAW$Lftklassen, "11=1; 12=1; 13=1; 14=1; 10:11=5; 12:14=6; 99=NA; else=0")
+
+#opl_lm opleiding laag midden
+SOURCE_RAW$opl_lm = recode(SOURCE_RAW$opl_dichVM, "0=0; 1=1; 9=NA")
+
+#ziek_lt langdurige ziekten
+SOURCE_RAW$ziek_lt = recode(SOURCE_RAW$CALGB260, "1=1; 2=0; 9=NA")
+
+#depri_hg matig of hoog risico op angst en depressie
+SOURCE_RAW$depri_hg = recode(SOURCE_RAW$GGADA202, "0=0; 1=1; 9=NA")
+
 
 #IQfac <- cut(IQ, breaks=c(0, 85, 115, Inf), labels=c("lo", "mid", "hi"))
 
@@ -266,7 +278,7 @@ SOURCE_SUBSET <- subset(SOURCE_SUBSET, select = -c(MMIKB201,GGEEB201,GGEEB203,GG
 
 #appending '_dich' to variable name of the remaining variables not containing '_dich'
 colnames(SOURCE_SUBSET) <- sub("^(?!.*_dich)(.*)", "\\1_dich", colnames(SOURCE_SUBSET), perl=TRUE)
-#excpet for respondent id
+#except for respondent id
 SOURCE_SUBSET$respondent_id <- SOURCE_SUBSET$respondent_id_dich
 SOURCE_SUBSET$respondent_id_dich <- NULL
 
@@ -344,17 +356,37 @@ n
 #-------------------------------------------------------------------------------
 # Distance matrix
 
-#for later
+gower_dist <- daisy(SOURCE_SUBSET,
+                    metric = "gower",
+                    type = list(logratio = 3))
+
+# Check attributes to ensure the correct methods are being used
+# (I = interval, N = nominal)
+# Note that despite logratio being called, 
+# the type remains coded as "I"
+
+summary(gower_dist)
+
+gower_mat <- as.matrix(gower_dist)
+
+# Output most similar pair
+SOURCE_SUBSET[
+  which(gower_mat == min(gower_mat[gower_mat != min(gower_mat)]),
+        arr.ind = TRUE)[1, ], ]
+
+
+
 
 #-------------------------------------------------------------------------------
 # Outliers
 
 #plot of Mahalanobis : outliers in multi-dimensional data
-outlier(SOURCE_SUBSET, plot=T, bad=10, na.rm=T)
+
+
+#outlier(SOURCE_SUBSET, plot=T, bad=10, na.rm=T)
 
 # Calculate Mahalanobis with predictor variables
-df2 <- SOURCE_SUBSET[, -1]    # Remove eenzaamheid variable
-head(df2)
+df2 <- SOURCE_SUBSET
 m_dist <- mahalanobis(df2, colMeans(df2), cov(df2))
 SOURCE_SUBSET$MD <- round(m_dist, 1)
 
@@ -369,7 +401,7 @@ SOURCE_SUBSET <- SOURCE_SUBSET[ which(SOURCE_SUBSET$MD < 20), ]
 head(SOURCE_SUBSET,2)
 
 #remove outlier indicators
-# why?  K-means is sensitive to outliers
+# why?  K-means is sensitive to outliers (otherwise use PAM)
 SOURCE_SUBSET$MD <- NULL
 SOURCE_SUBSET$outlier <- NULL
 dim(SOURCE_SUBSET)
@@ -379,6 +411,7 @@ cols.srce.nme <- paste0(data.loc, "cols-source-merged-",dest.nme.var, ".csv")
 write.csv(SOURCE_SUBSET, file=cols.srce.nme)
 
 #Bartlettas test of sphericity (test for homogeneity of variances) : To check if data reduction is possible
+#significance level must reside below of 0.05
 bartlett.test(SOURCE_SUBSET)
 
 
@@ -427,7 +460,7 @@ tsne_original=d_tsne
 
 
 #-------------------------------------------------------------------------------
-# II. Dimension Reduction > Clustering
+# II. Dimension Reduction (DR) > Clustering (CL)
 
 
 #-------------------------------------------------------------------------------
@@ -452,10 +485,13 @@ tsne_original=d_tsne
 CusKmeansFUN <- function(x,k) list(cluster=kmeans(x, k, iter.max=50))
 fviz_nbclust(d_tsne, FUNcluster=CusKmeansFUN, method="gap_stat")
 
+plot.nme = paste0('Rplot_gap_clusters_',dest.nme.var,'_k',k,'_p',perplex,'.png')
+plot.store <-paste0(plots.loc,plot.nme)
+ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio)
 
 
 #-------------------------------------------------------------------------------
-# I.2.1 TSNE (DR) > kmeans
+# II.1 TSNE (DR) > kmeans (CL)
 
 
 ## Creating k-means clustering model, and assigning the result to the data used to create the tsne
@@ -489,40 +525,45 @@ plot.store <-paste0(plots.loc,plot.nme)
 ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio)
 
 
-
-# I.2.2 TSNE (DR) > K-medoids clustering or PAM (less prone to outliers)
+#-------------------------------------------------------------------------------
+# II.2 TSNE (DR) > K-medoids clustering or PAM (CL)
+# less prone to outliers
 pam_res <- pam(d_tsne, k)
 
-pam_clus <- as.data.frame(pam_res$clustering)
+pam_res$clustering <- factor(pam_res$clustering)
+
+#add clustermemberschip to Tsne dataframe
+tsne_original$cl_pam <- pam_res$clustering
 
 
-
-
-# I.2.3 TSNE (DR) > hierarchical clustering
+#-------------------------------------------------------------------------------
+# II.3 TSNE (DR) > hierarchical clustering (CL)
 ## Creating hierarchical cluster model, and assigning the result to the data used to create the tsne
 
 #We use the Euclidean distance as distance metrics, and use 
 #Ward's minimum variance method to perform agglomerative clustering.
+
+plot.nme = paste0('Rplot_tsne_hca_colors_',dest.nme.var,'_k',k,'.png')
+plot.store <-paste0(plots.loc,plot.nme)
+png(filename=plot.store)
+
 fit_hca_tsne=hclust(dist(scale(d_tsne), method="euclidean"), method="ward.D2")
 head(fit_hca_tsne)
 
 dend <- as.dendrogram(fit_hca_tsne)
 
 # order it the closest we can to the order of the observations:
-dend <- rotate(dend, 1:150)
+#dend <- rotate(dend, 1:150)
 # Color the branches based on the clusters:
 dend <- color_branches(dend, k = k) 
 
 # plot dendrogram
-plot.nme = paste0('Rplot_tsne_hca_coooolors_',dest.nme.var,'_k',k,'.png')
-png(filename=plot.store)
+
 plot(dend, type = "rectangle", ylab = "Height", main = paste("TSNE > HCA of " , dest.nme.var , " k=",k,' perplexity=',perplex))
 
-#plot(dend, main = paste("TSNE > HCA of " , dest.nme.var , " k=",k,' perplexity=',perplex))
 rect.hclust(fit_hca_tsne, k = k, border = 2:4) 
-
 dev.off()
-plot.store <-paste0(plots.loc,plot.nme)
+
 
 ## setting k clusters as output
 tsne_original$cl_hierarchical = factor(cutree(fit_hca_tsne, k=k)) 
@@ -534,9 +575,7 @@ head(tsne_original,2)
 
 
 #-------------------------------------------------------------------------------
-# DR > Clustering
-
-# I.2.3 TSNE > DBSCAN
+# II.4 TSNE (DR) > DBSCAN (CL) (optional)
 #Density-based spatial clustering of applications with noise
 
 d_tsne_mat <- as.matrix(d_tsne)
@@ -578,7 +617,6 @@ colors <- mapply(function(col, i) adjustcolor(col, alpha.f = hdb$membership_prob
 plot(d_tsne, col=colors, pch=20)
 
 
-#tsne_original$cl_kmeansoncomp <-as.integer(cl_kmeans_vec)
 
 tsne_original$cl_hdbscan <-as.factor(hdb$cluster)
 
@@ -594,12 +632,16 @@ tsne_original$cl_hdbscan <-as.factor(hdb$cluster)
 
 
 #Kmeans 
-cs = cluster.stats(dist(SOURCE_SUBSET),as.numeric(tsne_original$cl_kmeans))
-cs[c("within.cluster.ss","avg.silwidth")]
+cs1 = cluster.stats(dist(SOURCE_SUBSET),as.numeric(tsne_original$cl_kmeans))
+cs1[c("within.cluster.ss","avg.silwidth")]
+
+#pam 
+cs2 = cluster.stats(dist(SOURCE_SUBSET),as.numeric(tsne_original$cl_pam))
+cs2[c("within.cluster.ss","avg.silwidth")]
 
 #hca 
-cs2 = cluster.stats(dist(SOURCE_SUBSET),as.numeric(tsne_original$cl_hierarchical))
-cs2[c("within.cluster.ss","avg.silwidth")]
+cs3 = cluster.stats(dist(SOURCE_SUBSET),as.numeric(tsne_original$cl_hierarchical))
+cs3[c("within.cluster.ss","avg.silwidth")]
 
 #hdbscan
 #cs3 = cluster.stats(dist(SOURCE_SUBSET),as.numeric(tsne_original$cl_hdbscan))
@@ -621,14 +663,12 @@ write.csv(tsne_original_export, file=cluster_membership_name,row.names=TRUE)
 
 u <- cbind.data.frame(SOURCE_SUBSET,tsne_original)
 z <- multimerge( list (SOURCE_RAW, u, GEO) )
-#colnames(z) <- gsub("^_", "", colnames(z))
 
 head(z,2)
 
 #clean NA notations
 z %>% replace(., is.na(.), "") %>% stringr::str_replace_all("[0-9]", "")
 
-class(z)
 final_ds_name <- paste0(data.loc,"Xfinal-",dest.nme.var,"-k",k,"-p",perplex)
 final_csv <- paste0(final_ds_name,".csv")
 final_sav <- paste0(final_ds_name,".sav")
@@ -638,17 +678,30 @@ dim(z)
 
 head(z)
 as.numeric(z$volgnummer)
-
 write.csv(z, file=final_csv,row.names=FALSE)
 write_sav(z, final_sav)
 
 
+#-------------------------------------------------------------------------------
+# III TSNE (DR) > KMEANS (CL) > PCA (DR)
+
 
 #-------------------------------------------------------------------------------
-# TSNE > KMEANS > PCA 
 
 
-dim_var <- c("cl_kmeans","gez_slecht",  "inkomenlaag_dich", "opl_dichVM", "geenbetaaldwerk", "dagactiviteit") 
+#Perspective : SES, situationeel
+#leeftijd70eo leeftijd 70 en ouder OK
+#gez_slecht gezondheid slecht OK
+#inkomenlaag_dich inkomen laag OK
+#geenbetaaldwerk geen betaald werk OK
+#opl_lm opleiding volwassenen laag midden
+#dagactiviteit betaald werk, vrijwilligerswerk, student OK
+#ziek_lt langdurige ziekten
+#depri_hg matig of hoog risico op angst en depressie
+
+
+dim_var <- c("cl_kmeans","leeftijd70eo","gez_slecht","inkomenlaag_dich", "dagactiviteit","geenbetaaldwerk","opl_lm", "ziek_lt",
+             "depri_hg") 
 
 #relevant variables for PCA
 q <- z[, dim_var]
@@ -658,7 +711,6 @@ q[] <- lapply(q, function(x) {
   if(is.factor(x)) as.numeric(as.character(x)) else x
 })
 
-
 q[q == 9] <- NA
 
 #delete records with missings
@@ -667,15 +719,18 @@ q <- na.omit(q)
 sapply(q, function(x) sum(is.na(x)))
 
 
-#pca per cluster
+dim(q)
+
+
+#pca per cluster, run this part manually 
 for(i in 1:k) {
   
   
-  v <-subset(q,cl_kmeans==i)
+  v <-subset(q,cl_kmeans==k)
  # q$cl_kmeans <- NULL
   
-  
-  dimens_comp<- principal(v[,-which(names(v)=="cl_kmeans")], nfactors = f, residuals = FALSE,rotate="none",n.obs=NA, covar=FALSE,
+
+  dimens_comp<- principal(v[,-which(names(v)=="cl_kmeans")], nfactors = 4, residuals = FALSE,rotate=rotation,n.obs=NA, covar=FALSE,
             scores=TRUE,missing=TRUE,impute="median")
   
   prop.table(dimens_comp$values)
@@ -686,4 +741,27 @@ for(i in 1:k) {
 }
 
 
+  
+  
 
+#scores per cluster  
+  qs <- z
+  cols_report <- c("cl_kmeans", "weegfactor3", "GGEES203", "GGRLS202", "GGADS201") 
+  qs_s <- qs[,cols_report]
+  
+  qs_s[] <- lapply(qs_s, function(x) {
+    if(is.factor(x)) as.numeric(as.character(x)) else x
+  })
+  
+    
+   a <- qs_s %>%
+      na.omit(cl_kmeans) %>%
+      group_by(cl_kmeans) %>%
+      summarise(
+        eenzaam_w = weighted.mean(GGEES203, weegfactor3),
+        regie_w = weighted.mean(GGRLS202, weegfactor3),
+        depri_w = weighted.mean(GGADS201, weegfactor3)
+         
+      )
+   
+   
