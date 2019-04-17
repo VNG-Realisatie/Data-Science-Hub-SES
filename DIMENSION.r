@@ -32,8 +32,11 @@ plots.loc <- paste0(root,'/PLOTS/')
 #set data location (create directory first)
 data.loc <- paste0(root,'/DATA/')
 
+#set library location (create directory first)
+lib.loc <- paste0(root,'/LIB/')
+
 #functions
-if(!exists("multimerge", mode="function")) source("D://DS/RSTAT/LIB/multimerge.R",local = TRUE)
+if(!exists("multimerge", mode="function")) source(paste0(lib.loc,"multimerge.R"),local = TRUE)
 
 #options
 set.seed(123)  # for reproducibility
@@ -132,8 +135,6 @@ SOURCE_RAW$ziek_lt = recode(SOURCE_RAW$CALGB260, "1=1; 2=0; 9=NA")
 #depri_hg matig of hoog risico op angst en depressie
 SOURCE_RAW$depri_hg = recode(SOURCE_RAW$GGADA202, "0=0; 1=1; 9=NA")
 
-
-#IQfac <- cut(IQ, breaks=c(0, 85, 115, Inf), labels=c("lo", "mid", "hi"))
 
 
 #-------------------------------------------------------------------------------
@@ -479,11 +480,11 @@ tsne_original=d_tsne
 # Optimal number of clusters
 
 #gap statistic (light version)
-#fviz_nbclust(d_tsne, kmeans, method = "gap_stat")
+fviz_nbclust(d_tsne, kmeans, method = "gap_stat")
 
 #heavy-duty version (when not converging within 10 iterations)
-CusKmeansFUN <- function(x,k) list(cluster=kmeans(x, k, iter.max=50))
-fviz_nbclust(d_tsne, FUNcluster=CusKmeansFUN, method="gap_stat")
+#CusKmeansFUN <- function(x,k) list(cluster=kmeans(x, k, iter.max=50))
+#fviz_nbclust(d_tsne, FUNcluster=CusKmeansFUN, method="gap_stat")
 
 plot.nme = paste0('Rplot_gap_clusters_',dest.nme.var,'_k',k,'_p',perplex,'.png')
 plot.store <-paste0(plots.loc,plot.nme)
@@ -578,47 +579,43 @@ head(tsne_original,2)
 # II.4 TSNE (DR) > DBSCAN (CL) (optional)
 #Density-based spatial clustering of applications with noise
 
-d_tsne_mat <- as.matrix(d_tsne)
+#d_tsne_mat <- as.matrix(d_tsne)
 
-kNNdistplot(d_tsne_mat, k=4)
-abline(h=0.4, col="red")
+#kNNdistplot(d_tsne_mat, k=4)
+#abline(h=0.4, col="red")
 
+#db <- dbscan(d_tsne_mat,eps = .4, MinPts = 4)
+#db
 
-db <- dbscan(d_tsne_mat,eps = .4, MinPts = 4)
-db
+#hullplot(d_tsne_mat, db$cluster)
+#table(tsne_original$cl_kmeans,db$cluster)
 
-hullplot(d_tsne_mat, db$cluster)
-table(tsne_original$cl_kmeans,db$cluster)
-
-
-pairs(d_tsne, col = db$cluster + 1L)
+#pairs(d_tsne, col = db$cluster + 1L)
 
 # Local outlier factor 
-lof <- lof(d_tsne, k = 4)
-pairs(d_tsne, cex = lof)
+#lof <- lof(d_tsne, k = 4)
+#pairs(d_tsne, cex = lof)
 
 #OPTICS
-opt <- optics(d_tsne, eps = 1, minPts = 4)
-opt
+#opt <- optics(d_tsne, eps = 1, minPts = 4)
+#opt
 
-opt <- extractDBSCAN(opt, eps_cl = .4)
-plot(opt)
+#opt <- extractDBSCAN(opt, eps_cl = .4)
+#plot(opt)
 
-opt <- extractXi(opt, xi = .05)
-opt
-plot(opt)
+#opt <- extractXi(opt, xi = .05)
+#opt
+#plot(opt)
 
-hdb <- hdbscan(d_tsne, minPts = 4)
+#hdb <- hdbscan(d_tsne, minPts = 4)
 
-plot(hdb, show_flat = T)
+#plot(hdb, show_flat = T)
 
-colors <- mapply(function(col, i) adjustcolor(col, alpha.f = hdb$membership_prob[i]), 
-                 palette()[hdb$cluster+1], seq_along(hdb$cluster))
-plot(d_tsne, col=colors, pch=20)
+#colors <- mapply(function(col, i) adjustcolor(col, alpha.f = hdb$membership_prob[i]), 
+#                 palette()[hdb$cluster+1], seq_along(hdb$cluster))
+#plot(d_tsne, col=colors, pch=20)
 
-
-
-tsne_original$cl_hdbscan <-as.factor(hdb$cluster)
+#tsne_original$cl_hdbscan <-as.factor(hdb$cluster)
 
 
 #-------------------------------------------------------------------------------
@@ -662,6 +659,7 @@ write.csv(tsne_original_export, file=cluster_membership_name,row.names=TRUE)
 # merging and writing original data, predictors, additional dichitomized varuables,clustering
 
 u <- cbind.data.frame(SOURCE_SUBSET,tsne_original)
+
 z <- multimerge( list (SOURCE_RAW, u, GEO) )
 
 head(z,2)
@@ -685,9 +683,8 @@ write_sav(z, final_sav)
 #-------------------------------------------------------------------------------
 # III TSNE (DR) > KMEANS (CL) > PCA (DR)
 
-
+#Samenloop van kenmerken binnen een cluster
 #-------------------------------------------------------------------------------
-
 
 #Perspective : SES, situationeel
 #leeftijd70eo leeftijd 70 en ouder OK
@@ -718,33 +715,33 @@ q <- na.omit(q)
 
 sapply(q, function(x) sum(is.na(x)))
 
-
 dim(q)
 
 
-#pca per cluster, run this part manually 
-for(i in 1:k) {
-  
-  
-  v <-subset(q,cl_kmeans==k)
+#PCA per cluster, run this part manually 
+#for(i in 1:k) {
+
+ # v <-subset(q,cl_kmeans==k)
  # q$cl_kmeans <- NULL
   
 
-  dimens_comp<- principal(v[,-which(names(v)=="cl_kmeans")], nfactors = 4, residuals = FALSE,rotate=rotation,n.obs=NA, covar=FALSE,
-            scores=TRUE,missing=TRUE,impute="median")
+  #  dimens_comp<- principal(v[,-which(names(v)=="cl_kmeans")], nfactors = 4, residuals = FALSE,rotate=rotation,n.obs=NA, covar=FALSE,
+  #           scores=TRUE,missing=TRUE,impute="median")
   
-  prop.table(dimens_comp$values)
+  # prop.table(dimens_comp$values)
 
-  dimens_comp$loadings
+  #dimens_comp$loadings
   
-  
-}
+#}
 
 
   
-  
+#-------------------------------------------------------------------------------
+# IV SCORES PER CLUSTER
 
-#scores per cluster  
+
+#-------------------------------------------------------------------------------
+
   qs <- z
   cols_report <- c("cl_kmeans", "weegfactor3", "GGEES203", "GGRLS202", "GGADS201") 
   qs_s <- qs[,cols_report]
@@ -761,7 +758,13 @@ for(i in 1:k) {
         eenzaam_w = weighted.mean(GGEES203, weegfactor3),
         regie_w = weighted.mean(GGRLS202, weegfactor3),
         depri_w = weighted.mean(GGADS201, weegfactor3)
-         
       )
    
    
+# TODO more ....
+   
+
+
+
+
+
