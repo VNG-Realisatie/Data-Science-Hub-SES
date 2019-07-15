@@ -76,11 +76,9 @@ data <- na.omit(SOURCE_SUBSET)
 model_ses <- readRDS("model_rf_ses.RDS")
 
 # prediction with the randomForest 
-
-
 pred.testR <- predict(model_ses, newdata = data)
 confusionMatrix(pred.testR, data$NSP)
 
 
 
-#or trace-back to best-fit plot position by similarity (gower)
+#or trace-back by plot coordinates by means ofsimilarity (gower)
