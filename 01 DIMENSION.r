@@ -386,8 +386,18 @@ sapply(SOURCE_SUBSET, function(x) sum(is.na(x)))
 
 #missing data imputation
 #method : Multivariate Imputation via Chained Equations, logreg (Logistic Regression) for binary features
-imp_data <- mice(SOURCE_SUBSET,m=5,maxit=30,meth='logreg',seed=500)
+pred <- make.predictorMatrix(SOURCE_SUBSET)
+pred
+
+imp_data <- mice(SOURCE_SUBSET,m=5,maxit=20,meth='logreg',seed=500, print=F)
+#inspect the convergence 
+plot(imp_data)
 summary(imp_data)
+
+#does maxit 40 lead to more convergence than maxit 20?
+imp40 <- mice.mids(imp_data, maxit=40, print=F)
+plot(imp40)
+
 #apply to SOURCE_SUBSET
 SOURCE_SUBSET <- complete(imp_data,1)
 
