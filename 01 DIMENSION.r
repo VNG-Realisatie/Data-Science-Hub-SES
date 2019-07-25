@@ -344,7 +344,7 @@ SOURCE_SUBSET <- subset(SOURCE_SUBSET, select = -c(eenzaamheid_dich,regie_dich,G
 #in-scope : '(potentieel) kwetsbaren'
 SOURCE_SUBSET$vulnerable_suspect <- 1
 
-#degrees of freedom (df)
+#predictors
 pred <- cols[1:(ncol(SOURCE_SUBSET))]
 
 pred_df <- length(pred)
@@ -381,29 +381,55 @@ head(SEQ,5)
  
 #stats on missing values (pre-imputation)
 sapply(SOURCE_SUBSET, function(x) sum(is.na(x)))
+md.pattern(SOURCE_SUBSET,plot = T)
+
 #remove cases with missing values (don't do this unless there are very good reasons)
 #SOURCE_SUBSET <- na.omit(SOURCE_SUBSET)
 
 #missing data imputation
 #method : Multivariate Imputation via Chained Equations, logreg (Logistic Regression) for binary features
+
+#method vector
+meth <- make.method(SOURCE_SUBSET)
+#make sure that binary data corresponds with logreg method
+meth
+
+#reset meth object for a particular feature
+#meth["XXX"] <- 'logreg'
+
+#predictorMatrix
 pred <- make.predictorMatrix(SOURCE_SUBSET)
 pred
 
-imp_data <- mice(SOURCE_SUBSET,m=5,maxit=20,meth='logreg',seed=500, print=F)
-#inspect the convergence 
-plot(imp_data)
-summary(imp_data)
+#fluxplot
+#Variables with higher outflux are (potentially) the more powerful.
+fx <- fluxplot(SOURCE_SUBSET)
+fx
 
-#does maxit 40 lead to more convergence than maxit 20?
-imp40 <- mice.mids(imp_data, maxit=40, print=F)
+#additional manipulation predictormatrix
+# to do
+
+#imp_data <- mice(SOURCE_SUBSET,method = "logreg", pred=pred,m=5,maxit=10,seed=500, print=F)
+
+imp_data <- mice(SOURCE_SUBSET,meth=meth, pred=pred,m=5,maxit=10,seed=500, print=F)
+#inspect the convergence 
+summary(imp_data)
+plot(imp_data)
+
+
+#do 30 additional iterations lead to more convergence than maxit 10?
+imp40 <- mice.mids(imp_data, maxit=30, print=F)
 plot(imp40)
 
 #apply to SOURCE_SUBSET
-SOURCE_SUBSET <- complete(imp_data,1)
+SOURCE_SUBSET <- complete(imp_data)
 
 #stats on missing values (post-imputation)
 sapply(SOURCE_SUBSET, function(x) sum(is.na(x)))
 
+
+mdf <- data.matrix(SOURCE_SUBSET) # convert to numeric matrix for correlation calculation 
+cor(mdf)
 
 #-------------------------------------------------------------------------------
 # Re-attach respondent id
