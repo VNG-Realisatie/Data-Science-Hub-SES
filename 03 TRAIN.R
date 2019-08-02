@@ -5,7 +5,7 @@
 # Train model
 # author : Mark Henry Gremmen, in cooperation with Gemma Smulders
 # DataScienceHub @ JADS, GGD Hart voor Brabant
-# lud 2019-07-12
+# lud 2019-08-01
 #-------------------------------------------------------------------------------
 
 #clear environment
@@ -53,7 +53,12 @@ SOURCE <- read.csv(source.file, T, ",")
 
 str(SOURCE)
 
-#original variables (not recoded) from the GGD Gezondheidsmonitor incl cluster membership cl_kmeans. 
+#set cluster membership of non-vulnerbale observations to zero 
+SOURCE$cl_kmeans[is.na(SOURCE$cl_kmeans)] <- 0
+
+head(SOURCE)
+
+#original variables (not recoded, different likert scales) from the GGD Gezondheidsmonitor incl cluster membership cl_kmeans. 
 #cluster membership must reside at the last position if the list 
 cols <- c("GGADS201","KLGGB201","MMIKB201","CALGA260","CALGA261","LGBPS205","GGEEB201","GGEEB203",
           "GGEEB204","GGEEB207","GGEEB208","GGRLB201","GGRLB202","GGRLB204","GGRLB206","GGADB201",
@@ -68,45 +73,46 @@ data <- na.omit(SOURCE_SUBSET)
 
 # spliting the data into train and test
 #SplitRatio : 60%:40% 
-data1= sample.split(data,SplitRatio = 0.4)
+inTrain= sample.split(data,SplitRatio = 0.4)
 
 #subsetting into train data
-train =subset(data,data1==TRUE)
+train =subset(data,inTrain==TRUE)
 
 #subsetting into test data
-test =subset(data,data1==FALSE)
+test =subset(data,inTrain==FALSE)
 
+#latent dimensions from PCA are used to train a classification model (to reduce noise)
 
-# cheacking the corralation of the data
-
-#data2 <- subset(data, select = -df_tr)
-#pairs.panels(train[,data2],gap= 0,pch= 22)
-
-# training the data with pca
 # important scale data TRUE 
-pca <- prcomp(train[,-df_tr],
-              scale. = T,
-              center = T)
+pca = prcomp(train[,-df_tr], scale=TRUE, center=TRUE)
 
-# checking attributes available pca
+#biplot
+biplot(pca, cex=.7)
+	
+#screeplot	
+screeplot(pca, type="line")			  
+
+# checking attributes available PCA
 attributes(pca)
 pca$center
 
-# analysing the pca model
+# analysing the PCA model
 print(pca)
 summary(pca)
 
-autoplot(prcomp(train), loadings= T,
-         loadings.colour = "blue", loadings.label = T, loadings.label.size=3,
-         frame= T)
+#autoplot(prcomp(train), loadings= T,
+#         loadings.colour = "blue", loadings.label = T, loadings.label.size=3,
+#         frame= T)
 
-# predicting traing data with pca
+# predicting training data with pca
 pca.train <- predict(pca, train)
 pca.train <- as.data.frame(pca.train)
 
-# adding our target variable which was not included during the pca training
+# adding our target variable which was not included during the PCA training
 pca.train <- cbind(pca.train, NSP= train[,"cl_kmeans"])
 
+
+#table(observed=, predicted=)
 
 # predicting test data with pca
 pca.test <- predict(pca, test)
@@ -122,6 +128,7 @@ pca.test$NSP <- as.factor(pca.test$NSP)
 
 pca.train$NSP <- relevel(pca.train$NSP, ref = "1")
 
+
 # selecting first 14 variables, together they are responsible for more than 95% of the variability of the data
 
 #multinomial logistic regression
@@ -132,21 +139,27 @@ model_mnlr <- multinom(NSP ~ PC1+PC2+PC3+PC4+PC5+PC6+PC7+PC8+PC9+PC10+PC11+PC12+
 model_rf <- randomForest(NSP ~ PC1+PC2+PC3+PC4+PC5+PC6+PC7+PC8+PC9+PC10+PC11+PC12+PC13+PC14,
                        data = pca.train)
 
+#variable importance plot RandonmForest for the 10 most important predictors
+varImpPlot(model_rf, n.var = 10, cex=.6)
 
 # prediction with the multinomial logistic regression
-pred.train <- predict(model_mnlr, newdata = pca.train)
-confusionMatrix(pred.train, pca.train$NSP)
+#train dataset
+#pred.train <- predict(model_mnlr, newdata = pca.train)
+#confusionMatrix(pred.train, pca.train$NSP)
 
+#test dataset
 pred.test <- predict(model_mnlr, newdata = pca.test)
 confusionMatrix(pred.test, pca.test$NSP)
 
 # prediction with the randomForest 
-pred.trainR <- predict(model_rf, newdata = pca.train)
-confusionMatrix(pred.trainR, pca.train$NSP)
+#pred.trainR <- predict(model_rf, newdata = pca.train)
+#confusionMatrix(pred.trainR, pca.train$NSP)
 
 pred.testR <- predict(model_rf, newdata = pca.test)
 confusionMatrix(pred.testR, pca.test$NSP)
 
 #write models
+#multinomial logistic regression
 saveRDS(model_mnlr , "model_mnlr_ses.RDS")
+#randomForest (prefered for SES project)
 saveRDS(model_rf , "model_rf_ses.RDS")

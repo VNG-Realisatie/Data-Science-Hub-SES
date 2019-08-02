@@ -65,9 +65,7 @@ f <- 4
 
 #rotation (PCA)
 #distinct dimensions
-#rotation <- "varimax"
-#natural dimensions
-rotation <- "none"
+rotation <- "varimax"
 
 #clustering method
 clustering <- "kmeans"
@@ -186,7 +184,7 @@ bp6
 dev.off()
 
 #eenzaamheid
-#ernstig eenzaam (9-10) en zeer ernstig eenzaam (11
+#ernstig eenzaam (9-10) en zeer ernstig eenzaam (11)
 z$GGEES203 <- as.numeric(z$GGEES203)
 plot.nme = paste0('cluster_',clustering,'_eenzaamheid.png')
 plot.store <-paste0(plots.loc,plot.nme)
@@ -407,8 +405,18 @@ dimens_comp<-NULL
 
 dimens_comp<- principal(v[,-which(names(v)=="cl_kmeans")], nfactors = f, residuals = FALSE,rotate=rotation,n.obs=NA, covar=FALSE,
                         scores=TRUE,missing=TRUE,impute="median")
+
+#reset f based on the elbow 						
+plot(dimens_comp$values, type="b")
+						
 prop.table(dimens_comp$values)
 
-dimens_comp$loadings
+print(loadings(dimens_comp), cutoff=0.4)
+
+#dimens_comp$loadings
+
+#biplot of the first three rotated PCs
+biplot(dimens_comp, choose=1:3, cutl=.4, smoother=TRUE)
+
 
 }

@@ -7,7 +7,7 @@
 # approach: unsupervised
 # author : Mark Henry Gremmen, in cooperation with Gemma Smulders
 # DataScienceHub @ JADS, GGD Hart voor Brabant
-# lud 2019-07-12
+# lud 2019-08-01
 #-------------------------------------------------------------------------------
 
 #clear environment
@@ -17,7 +17,7 @@ rm(list=ls())
 cat("\014")  
 
 #packages
-packages <- c("tools","here","tidyverse","naniar", "haven", "mice","VIM", "corrplot", "car", "nFactors", "psych", "caret", 
+packages <- c("tools","here","tidyverse","naniar", "haven", "stats", "mice","VIM", "corrplot", "car", "nFactors", "psych", "caret", 
               "Rtsne", "cluster","dbscan", "dendextend", "fpc", "factoextra", "rpart", "rpart.plot", "weights",  
               "ggplot2", "ggthemes", "qgraph", "gridExtra","randomForest","tidyr","dlookr", "aod")
 #install packages which are not available on the computing setup
@@ -53,7 +53,7 @@ set.seed(123)  # for reproducibility
 options(digits=3)
 
 #number of clusters (Kmeans, Hierarchical Cluster Analysis) 
-#always (re)check the optimal number of clusters first!!!
+#always (re)check the optimal number of clusters
 #see DIMENSION.R section II. 'Optimal number of clusters'
 #determine the optimal number of clusters first before running the entire script
 #run the script to the point (including) section II first
@@ -72,9 +72,7 @@ f <- 4
 
 #rotation (PCA)
 #distinct dimensions
-#rotation <- "varimax"
-#natural dimensions
-rotation <- "none"
+rotation <- "varimax"
 
 #dimension charts
 #height <- 7
@@ -274,7 +272,7 @@ save(SOURCE_ENRICHED,file=paste0(data.loc,"SOURCE_ENRICHED",".Rda"))
 #-------------------------------------------------------------------------------
 # Subsetting
 
-#attributes seletion : first three are higher other outcome features
+#features : first three are higher other outcome features
 #if you add features, please do so add the end of the list
 #only add dichotomized features (which indicicate experienced issues/vulnerability)
 cols <- c("eenzaamheid_dich","regie_dich","GGADS201","ervarengezondheid_dich",
@@ -693,7 +691,6 @@ dend <- color_branches(dend, k = k)
 # plot dendrogram
 
 plot(dend, type = "rectangle", ylab = "Height", main = paste("TSNE > HCA of " , dest.nme.var , " k=",k,' perplexity=',perplex),height = graph_height , width = graph_height * aspect_ratio)
-
 rect.hclust(fit_hca_tsne, k = k, border = 2:4) 
 dev.off()
 

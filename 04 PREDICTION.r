@@ -5,7 +5,7 @@
 # Predict cluster membership
 # author : Mark Henry Gremmen, in cooperation with Gemma Smulders
 # DataScienceHub @ JADS, GGD Hart voor Brabant
-# lud 2019-07-12
+# lud 2019-07-15
 #-------------------------------------------------------------------------------
 
 #packages
@@ -62,7 +62,7 @@ sapply(SOURCE_SUBSET, function(x) sum(is.na(x)))
 
 #missing data imputation
 #method : Multivariate Imputation via Chained Equations, random forest (rf) method
-imp_data <- mice(SOURCE_SUBSET,m=5,maxit=50,meth='rf',seed=500)
+imp_data <- mice(SOURCE_SUBSET,m=5,maxit=30,meth='rf',seed=500)
 summary(imp_data)
 #apply to SOURCE_SUBSET
 SOURCE_SUBSET <- complete(imp_data,1)
@@ -78,7 +78,6 @@ model_ses <- readRDS("model_rf_ses.RDS")
 # prediction with the randomForest 
 pred.testR <- predict(model_ses, newdata = data)
 confusionMatrix(pred.testR, data$NSP)
-
 
 
 #or trace-back by plot coordinates by means ofsimilarity (gower)
