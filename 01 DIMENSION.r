@@ -59,7 +59,7 @@ options(digits=3)
 #run the script to the point (including) section II first
 #the GAP plot will indicate the optimal number of clusters
 #adjust 'k' accordingly below. 
-k <- 8
+k <- 7
 
 #perplexity (Tsne)
 #In Tsne, the perplexity may be viewed as a knob that sets the number of 
@@ -153,7 +153,7 @@ GEO <- column_to_rownames(GEO, var = "respondent_id")
 #eenzaamheid_dich : (zeer) ernstig eenzaam (dichitoom)
 #regie_dich : onvoldoende regie over eigen leven (dichitoom)
 #GGADA202 : (mid-)Matig of hoog risico op angststoornis of depressie (dichitoom)
-#score_zw : hoge samenloop (op onderstaande items) (will be created onthefly) 
+#score_zw : hoge samenloop (op onderstaande items) (will be created on-the-fly) 
 
 #PREDICTORS (20 vars)
 
@@ -340,12 +340,12 @@ SOURCE_SUBSET <- SOURCE_SUBSET[ which(SOURCE_SUBSET$eenzaamheid_dich==1
 SOURCE_SUBSET <- subset(SOURCE_SUBSET, select = -c(eenzaamheid_dich,regie_dich,GGADS201_dich,score_zw))
 
 
-#predictors
+#number of dummy features (df)
 pred <- cols[1:(ncol(SOURCE_SUBSET))]
 
 pred_df <- length(pred)
 pred_df 
-#attach df value to plot and -title
+#attach df-value to plot name and -title
 dest.nme.var <- paste0(dest.nme.var,"_df",pred_df)
 
 #draw sample (for evaluation purposes) or limitations computing set-up/size population
@@ -377,6 +377,8 @@ head(SEQ,5)
  
 #stats on missing values (pre-imputation)
 sapply(SOURCE_SUBSET, function(x) sum(is.na(x)))
+
+#plot missing data pattern
 md.pattern(SOURCE_SUBSET,plot = T)
 
 #remove cases with missing values (don't do this unless there are very good reasons)
@@ -387,25 +389,36 @@ md.pattern(SOURCE_SUBSET,plot = T)
 
 #fluxplot
 #Variables with higher outflux are (potentially) the more powerful.
-fx <- fluxplot(SOURCE_SUBSET)
-fx
+(fluxplot(SOURCE_SUBSET))
 
-#initial run to determine powerful predictors for imputation
+#initial run to auto-determine powerful predictors for imputation
 ini <- mice(SOURCE_SUBSET,pred=quickpred(SOURCE_SUBSET, mincor=.3),seed=500, print=F)
-#prediction matrix
+#predictor matrix
 (pred <- ini$pred)
+
+
+#save(pred, file = "prediction_matrix_features.RData")
+
+#pred2 <- load("prediction_matrix_features.RData")
 
 #final run
 imp_data <- mice(SOURCE_SUBSET,method = "logreg", pred=pred,m=5,maxit=10,seed=500, print=T)
 
-#convergence
 summary(imp_data)
+
+#convergence
+#it is important that convergence is taking effect towards the end
 plot(imp_data)
 
+#do additional iterations lead to more convergence than maxit 10?
+imp_ext <- mice.mids(imp_data, maxit=30, print=F)
+plot(imp_ext)
 
-#do 20 additional iterations lead to more convergence than maxit 10?
-imp30 <- mice.mids(imp_data, maxit=20, print=F)
-plot(imp30)
+#if so use the extended version
+imp_data <- imp_ext
+
+#densityplot imputed versus original
+densityplot(imp_data)
 
 #apply to SOURCE_SUBSET
 SOURCE_SUBSET <- complete(imp_data)
@@ -439,7 +452,7 @@ n
 #Outlier detection for high-dimensional data (Mahalanobis)
 #Calculate Mahalanobis predictor variables
 #Mahalanobis squared distances using the (robust) minimum covariance determinant (MCD)
-mah_df <- SOURCE_SUBSET
+mah_df <- SOURCE_SUBSET[,-which(names(SOURCE_SUBSET) %in% c("vulnerable_suspect"))]
 m_dist <- mahalanobis(mah_df, colMeans(mah_df), cov(mah_df),method="mcd")
 SOURCE_SUBSET$MD <- round(m_dist, 1)
 
@@ -464,15 +477,14 @@ ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio)
 
 
 # Binary outlier variable
-# threshold determined by lower boundery of last-2 bin 
-threshold_zw <- 29.8 # Threshold 
+# threshold determined by upper boundery of last-1 bin, see outlier distribution plot 
+threshold_zw <- 35.1 # Threshold 
 SOURCE_SUBSET$outlier <- "No"
 SOURCE_SUBSET$outlier[SOURCE_SUBSET$MD > threshold_zw] <- "Yes"  
 
 SOURCE_SUBSET$outlier_fac <- 0
 SOURCE_SUBSET$outlier_fac[SOURCE_SUBSET$MD > threshold_zw] <- 1 
 hist(SOURCE_SUBSET$outlier_fac)
-
 
 
 #remove outlier indicators
@@ -485,7 +497,7 @@ dim(ANALYSIS_SUBSET)
 save(ANALYSIS_SUBSET,file=paste0(data.loc,"ANALYSIS_SUBSET",".Rda"))
 
 #save analysis subset to csv
-cols.srce.nme <- paste0(data.loc, "cols-source-merged-",dest.nme.var, ".csv")
+cols.srce.nme <- paste0(data.loc, "analysis-subset-",dest.nme.var, ".csv")
 write.csv(ANALYSIS_SUBSET, file=cols.srce.nme)
 
 #Bartlettas test of sphericity (test for homogeneity of variances) : check if data reduction is possible
@@ -520,6 +532,7 @@ bartlett.test(ANALYSIS_SUBSET)
 #-------------------------------------------------------------------------------
 # I.1 T-Distributed Stochastic Neighbor Embedding (TSNE)
 
+#reduce features to two dimensions with TSNE
 tsne_model = Rtsne(ANALYSIS_SUBSET, check_duplicates=FALSE, pca=TRUE, perplexity=perplex, theta=0.5, dims=2)
 
 #re-attach row id
@@ -552,7 +565,7 @@ plot.store <-paste0(plots.loc,plot.nme)
 ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio)
 
 
-## keeping original tsne data
+## keeping original TSNE data
 tsne_original=d_tsne
 #head(tsne_original)
 
@@ -624,7 +637,6 @@ tsne_original <- rename(tsne_original,pos_x=V1,pos_y=V2)
 
 head(tsne_original,2)
 
-
 ## plotting the results with Kmeans clustering
 plot.title = paste0('TSNE > Kmeans of ',dest.nme.var, ' k=',k,' perplexity=',perplex)
 ggplot(tsne_original, aes(pos_x, pos_y, color = cl_kmeans)) +
@@ -650,7 +662,6 @@ title = paste0('TSNE > PAM of ',dest.nme.var, ' k=',k)
 fviz_cluster(pam_res, geom = "point", ellipse.type = "convex") + 
 labs(title = title)
 ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio)
-
 
 pam_res$clustering <- factor(pam_res$clustering)
 
@@ -755,16 +766,16 @@ head(tsne_original,2)
 # Compare cluster methods
 
 #within.cluster.ss measurement shows how closely related objects are in 
-#clusters; the smaller the value, the more closely related objects are within the cluster
+#clusters; the smaller the value, the more closely related are observations within the cluster
 
 #avg.silwidth is a measurement that considers how closely related objects 
 #are within the cluster and how clusters are separated from each other.
 
+#PAM 
 #Kmeans 
 cs1 = cluster.stats(dist(ANALYSIS_SUBSET),as.numeric(tsne_original$cl_kmeans))
 cs1[c("within.cluster.ss","avg.silwidth")]
 
-#PAM 
 cs2 = cluster.stats(dist(ANALYSIS_SUBSET),as.numeric(tsne_original$cl_pam))
 cs2[c("within.cluster.ss","avg.silwidth")]
 
@@ -792,20 +803,19 @@ write.csv(tsne_original_export, file=cluster_membership_name,row.names=TRUE)
 # merging and writing all data
 #do remove GEO dataframe if GEO / location parameters are included in the main dataset
 #total population
-z <- multimerge( list (SOURCE_ENRICHED, GEO, zw, tsne_original) )
+z <- multimerge(list (SOURCE_ENRICHED, GEO, zw, tsne_original))
 z <- as.data.frame(z)
 head(z,2)
 
 #dichotomize clustermembership Kmeans per clusters 
 for (cluster in 1:k){
-  col = sprintf("clus%d", cluster)
+  col = sprintf("kmeans_clus%d", cluster)
   z[col] = as.integer(as.logical(z$cl_kmeans == cluster))
 }
 
 #dichotomize vulnerability
 z$vulnerable <- as.integer(as.logical(as.integer(z$cl_kmeans)>0))
 z$vulnerable[is.na(z$vulnerable)] <- 0
-
 
 #clean NA notations
 #z %>% replace(., is.na(.), "") %>% stringr::str_replace_all("[0-9]", "")

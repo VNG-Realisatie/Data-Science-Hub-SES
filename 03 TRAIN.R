@@ -15,8 +15,9 @@ rm(list=ls())
 cat("\014")  
 
 #packages
-packages <- c("tools","here","tidyverse","caTools", "psych", "RColorBrewer",
-              "ggplot2","ggfortify","tidyr", "nnet", "caret","randomForest")
+packages <- c("tools","here","tidyverse","caTools", "psych", "RColorBrewer", "xgboost",
+              "ggplot2","ggfortify","tidyr", "nnet", "caret","randomForest", "gbm", "car",
+              "stringr")
 #install packages which are not available
 has_available   <- packages %in% rownames(installed.packages())
 if(any(!has_available)) install.packages(packages[!has_available])
@@ -47,7 +48,8 @@ data.loc <- paste0(root,'/DATA/')
 lib.loc <- paste0(root,'/LIB/')
 
 #source file name (csv-format)
-source.file <- paste0(data.loc,'Xfinal-zorgwekkend_df20-k8-p40.csv')
+#make sure the filename corresponds with the paramaters used in procedure '01 DIMENSION'
+source.file <- paste0(data.loc,'Xfinal-zorgwekkend_df20-k7-p40.csv')
 
 SOURCE <- read.csv(source.file, T, ",")
 
@@ -65,6 +67,7 @@ cols <- c("GGADS201","KLGGB201","MMIKB201","CALGA260","CALGA261","LGBPS205","GGE
           "GGADB202","GGADB204","GGADB207","GGADB210","cl_kmeans") 
 SOURCE_SUBSET <- subset(SOURCE, select = cols)
 dim(SOURCE_SUBSET)
+#number of features
 df_tr <- ncol(SOURCE_SUBSET)
 df_tr
 
@@ -73,7 +76,7 @@ data <- na.omit(SOURCE_SUBSET)
 
 # spliting the data into train and test
 #SplitRatio : 60%:40% 
-inTrain= sample.split(data,SplitRatio = 0.4)
+inTrain= sample.split(data,SplitRatio = 0.5)
 
 #subsetting into train data
 train =subset(data,inTrain==TRUE)
@@ -90,7 +93,8 @@ pca = prcomp(train[,-df_tr], scale=TRUE, center=TRUE)
 biplot(pca, cex=.7)
 	
 #screeplot	
-screeplot(pca, type="line")			  
+screeplot(pca, type="line", main="Scree plot")
+abline(h=1)
 
 # checking attributes available PCA
 attributes(pca)
@@ -109,6 +113,7 @@ pca.train <- predict(pca, train)
 pca.train <- as.data.frame(pca.train)
 
 # adding our target variable which was not included during the PCA training
+# NSP is cluster membership
 pca.train <- cbind(pca.train, NSP= train[,"cl_kmeans"])
 
 
@@ -128,18 +133,21 @@ pca.test$NSP <- as.factor(pca.test$NSP)
 
 pca.train$NSP <- relevel(pca.train$NSP, ref = "1")
 
-
-# selecting first 14 variables, together they are responsible for more than 95% of the variability of the data
+# selecting first 10 variables, together they are responsible for more than 85% of the variability of the data
+# the number of dimensions effects teh accuracy rate of the model.
+# more dimensions is not always better
+# the PCA-method and the selective approach in the number of dimensions is a way to get lose noise
 
 #multinomial logistic regression
-model_mnlr <- multinom(NSP ~ PC1+PC2+PC3+PC4+PC5+PC6+PC7+PC8+PC9+PC10+PC11+PC12+PC13+PC14,
+model_mnlr <- multinom(NSP ~ PC1+PC2+PC3+PC4+PC5+PC6+PC7+PC8+PC9+PC10,
                   data = pca.train)
 
+
 #randomForest
-model_rf <- randomForest(NSP ~ PC1+PC2+PC3+PC4+PC5+PC6+PC7+PC8+PC9+PC10+PC11+PC12+PC13+PC14,
+model_rf <- randomForest(NSP ~ PC1+PC2+PC3+PC4+PC5+PC6+PC7+PC8+PC9+PC10,
                        data = pca.train)
 
-#variable importance plot RandonmForest for the 10 most important predictors
+#variable importance plot RandonmForest for predictors
 varImpPlot(model_rf, n.var = 10, cex=.6)
 
 # prediction with the multinomial logistic regression
@@ -148,17 +156,20 @@ varImpPlot(model_rf, n.var = 10, cex=.6)
 #confusionMatrix(pred.train, pca.train$NSP)
 
 #test dataset
-pred.test <- predict(model_mnlr, newdata = pca.test)
-confusionMatrix(pred.test, pca.test$NSP)
+pred.test.mnlr <- predict(model_mnlr, newdata = pca.test)
+confusionMatrix(pred.test.mnlr, pca.test$NSP)
 
 # prediction with the randomForest 
 #pred.trainR <- predict(model_rf, newdata = pca.train)
 #confusionMatrix(pred.trainR, pca.train$NSP)
 
-pred.testR <- predict(model_rf, newdata = pca.test)
-confusionMatrix(pred.testR, pca.test$NSP)
+pred.test.rf <- predict(model_rf, newdata = pca.test)
+confusionMatrix(pred.test.rf, pca.test$NSP)
 
-#write models
+#accuracy rate in the confusionmatrices indicate that randomForest is 
+#the best prediction model
+
+#write prediction models
 #multinomial logistic regression
 saveRDS(model_mnlr , "model_mnlr_ses.RDS")
 #randomForest (prefered for SES project)
