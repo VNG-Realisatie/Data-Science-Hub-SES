@@ -7,7 +7,7 @@
 # approach: unsupervised
 # author : Mark Henry Gremmen, in cooperation with Gemma Smulders
 # DataScienceHub @ JADS, GGD Hart voor Brabant
-# lud 2019-08-01
+# lud 2019-08-09
 #-------------------------------------------------------------------------------
 
 #clear environment
@@ -36,11 +36,14 @@ sessionInfo()
 root <- getwd()
 root
 
+#GGD 
+ggd <- 'HVB' #Hart voor Brabant
+
 #set graphs location (if na, create directory first)
-plots.loc <- paste0(root,'/PLOTS/')
+plots.loc <- paste0(root,'/PLOTS/',ggd,'/')
 
 #set data location (if na, create directory first)
-data.loc <- paste0(root,'/DATA/')
+data.loc <- paste0(root,'/DATA/',ggd,'/')
 
 #set library location (if na, create directory first)
 lib.loc <- paste0(root,'/LIB/')
@@ -59,7 +62,7 @@ options(digits=3)
 #run the script to the point (including) section II first
 #the GAP plot will indicate the optimal number of clusters
 #adjust 'k' accordingly below. 
-k <- 7
+k <- 9
 
 #perplexity (Tsne)
 #In Tsne, the perplexity may be viewed as a knob that sets the number of 
@@ -68,11 +71,7 @@ k <- 7
 perplex <- 40
 
 #number of factors (PCA)
-f <- 4
-
-#rotation (PCA)
-#distinct dimensions
-rotation <- "varimax"
+#f <- 4
 
 #dimension charts
 #height <- 7
@@ -80,19 +79,19 @@ graph_height <- 8
 png_height <- 600
 aspect_ratio <- 2
 
-#color scheme
-colors_cust <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+#custom color scheme
+colors_cust <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#ff0000")
 
 
 #-------------------------------------------------------------------------------
 # LOAD DATA 
 # 3 options:
 
-#1. load Spss data from location DATA
+#1. load Spss dataset from location DATA
 srce.loc <- paste0(data.loc,"GGD-MONITOR-2016.sav")
 SOURCE_RAW <- read_spss(srce.loc)
 
-#2. load Spss data via modal window
+#2. load Spss dataset via modal window
 #db = choose.files()
 
 #SOURCE_RAW <- read_spss(db,
@@ -145,6 +144,8 @@ GEO$respondent_id <- paste0("x",GEO$volgnummer)
 GEO <- remove_rownames(GEO)
 GEO <- column_to_rownames(GEO, var = "respondent_id")
 
+#GGD region
+GEO$GGD <- ggd
 
 #-------------------------------------------------------------------------------
 #DATA PREPARATION
@@ -153,16 +154,17 @@ GEO <- column_to_rownames(GEO, var = "respondent_id")
 #eenzaamheid_dich : (zeer) ernstig eenzaam (dichitoom)
 #regie_dich : onvoldoende regie over eigen leven (dichitoom)
 #GGADA202 : (mid-)Matig of hoog risico op angststoornis of depressie (dichitoom)
+#ervarengezondheid_dich ; (zeer) slechte gezondheid (dichitoom)
 #score_zw : hoge samenloop (op onderstaande items) (will be created on-the-fly) 
 
-#PREDICTORS (20 vars)
+#FEATURES (20 vars)
 
 #gezondheid en beperkingen - 5 vars 
-#ervarengezondheid_dich ; (zeer) slechte gezondheid (dichitoom)
-#MMIKB201 : moeite met rondkomen (nog dischitomiseren)
 #CALGA260 : Heeft langdurige ziekte(n) of aandoening(en) (dichitoom)
 #CALGA261 : Is (ernstig) beperkt in activiteiten vanwege gezondheid (dichitoom)
-#LGBPS205 : Heeft mobiliteitsbeperkingen (ofwel minimaal grote moeite met 1 vd 3 OECD items mbt mobiliteit) (dichitoom)
+#LGBPS209 : Heeft minimaal een beperking met horen, zien of mobiliteit (ofwel minimaal grote moeite met 1 vd 7 OECD items)
+#AGGWS205 : Obesitas, ofwel een BMI van 30 of hoger
+#MMIKB201 : moeite met rondkomen (nog dischitomiseren)
 
 #proxy eenzaamheid - 5 vars
 #GGEEB201 : !Kan praten over dagelijkse problemen (nog dischitomiseren)
@@ -272,11 +274,11 @@ save(SOURCE_ENRICHED,file=paste0(data.loc,"SOURCE_ENRICHED",".Rda"))
 #-------------------------------------------------------------------------------
 # Subsetting
 
-#features : first three are higher other outcome features
+#features : first four are higher other outcome variables
 #if you add features, please do so add the end of the list
 #only add dichotomized features (which indicicate experienced issues/vulnerability)
 cols <- c("eenzaamheid_dich","regie_dich","GGADS201","ervarengezondheid_dich",
-          "MMIKB201_dich","CALGA260","CALGA261","LGBPS205","GGEEB201_dich","GGEEB203_dich","GGEEB204_dich","GGEEB207_dich",
+          "MMIKB201_dich","CALGA260","CALGA261","LGBPS209","AGGWS205","GGEEB201_dich","GGEEB203_dich","GGEEB204_dich","GGEEB207_dich",
           "GGEEB208_dich","GGRLB201_dich","GGRLB202_dich","GGRLB204_dich","GGRLB206_dich","GGADB201_dich","GGADB202_dich","GGADB204_dich",
           "GGADB207_dich","GGADB210_dich","dagactiviteit_dich") 
 SOURCE_SUBSET <- subset(SOURCE_ENRICHED, select = cols)
@@ -286,10 +288,10 @@ colnames(SOURCE_SUBSET) <- sub("^(?!.*_dich)(.*)", "\\1_dich", colnames(SOURCE_S
 
 #scope
 #title- and file name string 
-dest.nme.var <- paste0("","zorgwekkend")
+dest.nme.var <- paste0("zorgwekkend", "_",ggd)
 
 #proxy for level of issues: 'hoge samenloop / multi-problematiek' 
-SOURCE_SUBSET$score_zw <- rowSums(SOURCE_SUBSET[,4:ncol(SOURCE_SUBSET)],na.rm=TRUE)
+SOURCE_SUBSET$score_zw <- rowSums(SOURCE_SUBSET[,5:ncol(SOURCE_SUBSET)],na.rm=TRUE)
 
 #store 'samenloop' -score in dataframe for later
 samenloop <- SOURCE_SUBSET[,c("score_zw")]
@@ -328,16 +330,20 @@ dev.off()
 
 #select cases 
 #kwetsbare of (dreigende) zorgwekkende gevallen op het vlak van 
-#eenzaamheid en / of gebrek regie op het leven, en / of angststoornis/depressie en / of samenloop van problematiek
+#eenzaamheid en / of gebrek regie op het leven, en / of angststoornis/depressie en / of
+#ervaren gezondheid is slechts en / of samenloop van problematiek
 #adjust threshold gebrek aan regie en samenloop based on binning and boxplot results (see above)
 
 SOURCE_SUBSET <- SOURCE_SUBSET[ which(SOURCE_SUBSET$eenzaamheid_dich==1
                                       | SOURCE_SUBSET$regie_dich==1 
                                       | SOURCE_SUBSET$GGADS201_dich>22
-                                      | SOURCE_SUBSET$score_zw>5), ]
+                                      | SOURCE_SUBSET$ervarengezondheid_dich==1
+                                      | SOURCE_SUBSET$score_zw>5)
+                                      , ]
+
 
 #remove select / outcome variables (keep relevant variables for the fingerprint)
-SOURCE_SUBSET <- subset(SOURCE_SUBSET, select = -c(eenzaamheid_dich,regie_dich,GGADS201_dich,score_zw))
+SOURCE_SUBSET <- subset(SOURCE_SUBSET, select = -c(eenzaamheid_dich,regie_dich,GGADS201_dich,ervarengezondheid_dich,score_zw))
 
 
 #number of dummy features (df)
@@ -396,10 +402,9 @@ ini <- mice(SOURCE_SUBSET,pred=quickpred(SOURCE_SUBSET, mincor=.3),seed=500, pri
 #predictor matrix
 (pred <- ini$pred)
 
+save(pred, file = "prediction_matrix_features.RData")
 
-#save(pred, file = "prediction_matrix_features.RData")
-
-#pred2 <- load("prediction_matrix_features.RData")
+#pred <- load("prediction_matrix_features.RData")
 
 #final run
 imp_data <- mice(SOURCE_SUBSET,method = "logreg", pred=pred,m=5,maxit=10,seed=500, print=T)
@@ -411,7 +416,7 @@ summary(imp_data)
 plot(imp_data)
 
 #do additional iterations lead to more convergence than maxit 10?
-imp_ext <- mice.mids(imp_data, maxit=30, print=F)
+imp_ext <- mice.mids(imp_data, maxit=5, print=F)
 plot(imp_ext)
 
 #if so use the extended version
@@ -503,7 +508,7 @@ write.csv(ANALYSIS_SUBSET, file=cols.srce.nme)
 #Bartlettas test of sphericity (test for homogeneity of variances) : check if data reduction is possible
 #significance level must reside below of 0.05
 bartlett.test(ANALYSIS_SUBSET)
-#levine normale verdling 
+#levine normale verdeling 
 
 
 #-------------------------------------------------------------------------------
@@ -633,7 +638,7 @@ fit_cluster_kmeans$cluster <- factor(fit_cluster_kmeans$cluster)
 tsne_original$cl_kmeans <- fit_cluster_kmeans$cluster
 
 tsne_original$cl_kmeans <- as.factor(tsne_original$cl_kmeans)
-tsne_original <- rename(tsne_original,pos_x=V1,pos_y=V2)
+#tsne_original <- rename(tsne_original,pos_x=V1,pos_y=V2)
 
 head(tsne_original,2)
 
@@ -805,7 +810,6 @@ write.csv(tsne_original_export, file=cluster_membership_name,row.names=TRUE)
 #total population
 z <- multimerge(list (SOURCE_ENRICHED, GEO, zw, tsne_original))
 z <- as.data.frame(z)
-head(z,2)
 
 #dichotomize clustermembership Kmeans per clusters 
 for (cluster in 1:k){
@@ -825,7 +829,7 @@ final_csv <- paste0(final_ds_name,".csv")
 final_sav <- paste0(final_ds_name,".sav")
 
 #z <- as.data.frame(z)
-head(z)
+head(z,2)
 dim(z)
 
 as.numeric(z$volgnummer)

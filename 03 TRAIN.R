@@ -147,6 +147,12 @@ model_mnlr <- multinom(NSP ~ PC1+PC2+PC3+PC4+PC5+PC6+PC7+PC8+PC9+PC10,
 model_rf <- randomForest(NSP ~ PC1+PC2+PC3+PC4+PC5+PC6+PC7+PC8+PC9+PC10,
                        data = pca.train)
 
+#write prediction models
+#multinomial logistic regression
+saveRDS(model_mnlr , "model_mnlr_ses.RDS")
+#randomForest (prefered for SES project)
+saveRDS(model_rf , "model_rf_ses.RDS")
+
 #variable importance plot RandonmForest for predictors
 varImpPlot(model_rf, n.var = 10, cex=.6)
 
@@ -169,8 +175,4 @@ confusionMatrix(pred.test.rf, pca.test$NSP)
 #accuracy rate in the confusionmatrices indicate that randomForest is 
 #the best prediction model
 
-#write prediction models
-#multinomial logistic regression
-saveRDS(model_mnlr , "model_mnlr_ses.RDS")
-#randomForest (prefered for SES project)
-saveRDS(model_rf , "model_rf_ses.RDS")
+

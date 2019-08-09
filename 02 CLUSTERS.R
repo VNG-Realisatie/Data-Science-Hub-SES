@@ -35,11 +35,14 @@ sessionInfo()
 root <- getwd()
 root
 
+#GGD 
+ggd <- 'HVB' #Hart voor Brabant
+
 #set graphs location (if na, create directory first)
-plots.loc <- paste0(root,'/PLOTS/')
+plots.loc <- paste0(root,'/PLOTS/',ggd,'/')
 
 #set data location (if na, create directory first)
-data.loc <- paste0(root,'/DATA/')
+data.loc <- paste0(root,'/DATA/',ggd,'/')
 
 #set library location (if na, create directory first)
 lib.loc <- paste0(root,'/LIB/')
