@@ -1,4 +1,5 @@
-# Data-Science-Hub-SES
+# Data science maakt kwetsbare inwoners zichtbaar
+
 Hoe weet je als gemeente nu welke bevolkingsgroepen kwetsbaar zijn en waar zich mogelijk zorgwekkende situaties voordoen? En op welke manier je de neerwaartse spiraal van opeenstapelende problemen kunt doorbreken?
 
 Kwetsbare inwoners ondersteunen zodat ze niet in een sociaal isolement terechtkomen. Een mooi streven, maar hoe vinden gemeenten deze mensen? Met behulp van data science brengen GGD Hart voor Brabant, de gemeenten Uden, Brummen, Westland en Data Science Hub van VNG Realisatie in beeld waar zich welke groepen potentieel kwetsbare inwoners bevinden.
