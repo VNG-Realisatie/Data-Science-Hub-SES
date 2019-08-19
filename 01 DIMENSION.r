@@ -7,7 +7,7 @@
 # approach: unsupervised
 # author : Mark Henry Gremmen, in cooperation with Gemma Smulders
 # DataScienceHub @ JADS, GGD Hart voor Brabant
-# lud 2019-08-09
+# lud 2019-08-16
 #-------------------------------------------------------------------------------
 
 #clear environment
@@ -37,12 +37,14 @@ root <- getwd()
 root
 
 #GGD 
-ggd <- 'HVB' #Hart voor Brabant
+#ggd <- 'HVB' #Hart voor Brabant
+ggd <- 'ZHZ' #ZuidHollandZuid
 
-#set graphs location (if na, create directory first)
+
+#set graphs location (if na, create (sub)directory first)
 plots.loc <- paste0(root,'/PLOTS/',ggd,'/')
 
-#set data location (if na, create directory first)
+#set data location (if na, create (sub)directory first)
 data.loc <- paste0(root,'/DATA/',ggd,'/')
 
 #set library location (if na, create directory first)
@@ -62,7 +64,7 @@ options(digits=3)
 #run the script to the point (including) section II first
 #the GAP plot will indicate the optimal number of clusters
 #adjust 'k' accordingly below. 
-k <- 9
+k <- 8
 
 #perplexity (Tsne)
 #In Tsne, the perplexity may be viewed as a knob that sets the number of 
@@ -80,7 +82,7 @@ png_height <- 600
 aspect_ratio <- 2
 
 #custom color scheme
-colors_cust <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#ff0000")
+colors_cust <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#ff0000", "#ababab")
 
 
 #-------------------------------------------------------------------------------
@@ -136,6 +138,7 @@ save(SOURCE_RAW,file=paste0(data.loc,"SOURCE_RAW",".Rda"))
 #if included in the main dataframe please comment the following 3 lines
 #... and the cbind of the GEO dataframe near the end of the procedure
 geo.loc <- paste0(data.loc,"GGD-MONITOR-2016-GEO.sav")
+
 GEO <- read_spss(geo.loc)
 GEO <- as.data.frame(GEO)
 
@@ -209,19 +212,22 @@ SOURCE_RAW$dagactiviteit[SOURCE_RAW$MMWSA205==1 | SOURCE_RAW$MMVWB201==1 | SOURC
 #4 '60 tot 80% (max 35.100 euro)' 5 '80 tot 100% (> 35.100 euro)' 9 'onbekend'.
 
 #inkomenzeerlaag_dich 1 'zeer laag, max 16.100 euro' 0 'hoger'
-SOURCE_RAW$inkomenzeerlaag_dich = recode(SOURCE_RAW$inkkwin_2016, "1=1; 2=0; 3=0; 4=0; 5=0; 9=NA")
+#SOURCE_RAW$inkomenzeerlaag_dich = recode(SOURCE_RAW$inkkwin_2016, "1=1; 2=0; 3=0; 4=0; 5=0; 9=NA")
+SOURCE_RAW$inkomenzeerlaag_dich = recode(SOURCE_RAW$KwintielInk, "1=1; 2=0; 3=0; 4=0; 5=0; 9=NA")
 
 #inkomenlaag_dich 1 'laag, max 21.300 euro' 0 'hoger'
-SOURCE_RAW$inkomenlaag_dich = recode(SOURCE_RAW$inkkwin_2016, "1=1; 2=1; 3=0; 4=0; 5=0; 9=NA")
+#SOURCE_RAW$inkomenlaag_dich = recode(SOURCE_RAW$inkkwin_2016, "1=1; 2=1; 3=0; 4=0; 5=0; 9=NA")
+SOURCE_RAW$inkomenlaag_dich = recode(SOURCE_RAW$KwintielInk, "1=1; 2=1; 3=0; 4=0; 5=0; 9=NA")
 
 #leeftijdcat6  'leeftijd in 6 categorieen obv geboortedatum' 
 SOURCE_RAW$leeftijdcat6 = recode(SOURCE_RAW$Lftklassen, "1=1; 2:4=2; 5:7=3; 8:9=4; 10:11=5; 12:14=6; 99=NA")
 
 #leeftijd70eo 'leeftijd 70 jaar of ouder'
-SOURCE_RAW$leeftijd70eo = recode(SOURCE_RAW$Lftklassen, "11=1; 12=1; 13=1; 14=1; 10:11=5; 12:14=6; 99=NA; else=0")
+SOURCE_RAW$leeftijd70eo = recode(SOURCE_RAW$Lftklassen, "11=1; 12=1; 13=1; 14=1; 99=NA; else=0")
 
-#opl_lm opleiding laag midden
-SOURCE_RAW$opl_lm = recode(SOURCE_RAW$opl_dichVM, "0=0; 1=1; 9=NA")
+#opl_lm opleiding laag midden 1
+#SOURCE_RAW$opl_lm = recode(SOURCE_RAW$opl_dichVM, "0=0; 1=1; 9=NA")
+SOURCE_RAW$opl_lm = recode(SOURCE_RAW$Opleiding_samind, "1=1; 2=1; 3=0; 4=0; 9=NA")
 
 #ziek_lt langdurige ziekten
 SOURCE_RAW$ziek_lt = recode(SOURCE_RAW$CALGB260, "1=1; 2=0; 9=NA")
@@ -307,7 +313,7 @@ bin_outcome <- SOURCE_SUBSET %>%
          )
 
 #regie en samenloop
-plot.nme = paste0('explore_regie_samenloop.png')
+plot.nme = paste0(ggd,'_explore_regie_samenloop.png')
 plot.store <-paste0(plots.loc,plot.nme)
 png(filename=plot.store,height = png_height,width = png_height * aspect_ratio)
 
@@ -317,7 +323,7 @@ bp1
 dev.off()
 
 #samenloop en regie
-plot.nme = paste0('explore_samenloop_regie.png')
+plot.nme = paste0(ggd,'_explore_samenloop_regie.png')
 plot.store <-paste0(plots.loc,plot.nme)
 png(filename=plot.store,height = png_height,width = png_height * aspect_ratio)
 bp2 <- boxplot(score_zw~rg_bin,data=bin_outcome, main="Samenloop * gebrek aan regie",
@@ -346,7 +352,7 @@ SOURCE_SUBSET <- SOURCE_SUBSET[ which(SOURCE_SUBSET$eenzaamheid_dich==1
 SOURCE_SUBSET <- subset(SOURCE_SUBSET, select = -c(eenzaamheid_dich,regie_dich,GGADS201_dich,ervarengezondheid_dich,score_zw))
 
 
-#number of dummy features (df)
+#number of dichotomous features (df)
 pred <- cols[1:(ncol(SOURCE_SUBSET))]
 
 pred_df <- length(pred)
@@ -395,7 +401,12 @@ md.pattern(SOURCE_SUBSET,plot = T)
 
 #fluxplot
 #Variables with higher outflux are (potentially) the more powerful.
-(fluxplot(SOURCE_SUBSET))
+plot.nme = paste0(ggd,'_fluxplot_pattern.png')
+plot.store <-paste0(plots.loc,plot.nme)
+png(filename=plot.store,height = png_height,width = png_height * aspect_ratio)
+fplot <- fluxplot(SOURCE_SUBSET)
+fplot
+dev.off()
 
 #initial run to auto-determine powerful predictors for imputation
 ini <- mice(SOURCE_SUBSET,pred=quickpred(SOURCE_SUBSET, mincor=.3),seed=500, print=F)
@@ -416,19 +427,30 @@ summary(imp_data)
 plot(imp_data)
 
 #do additional iterations lead to more convergence than maxit 10?
-imp_ext <- mice.mids(imp_data, maxit=5, print=F)
-plot(imp_ext)
+imp_ext <- mice.mids(imp_data, maxit=20, print=F)
+
+plot.nme = paste0(ggd,'_convergence_imputation_iterations.png')
+plot.store <-paste0(plots.loc,plot.nme)
+png(filename=plot.store,height = png_height,width = png_height * aspect_ratio)
+cplot <- plot(imp_ext)
+cplot
+dev.off()
 
 #if so use the extended version
 imp_data <- imp_ext
 
 #densityplot imputed versus original
-densityplot(imp_data)
+plot.nme = paste0(ggd,'_imputation_pattern.png')
+plot.store <-paste0(plots.loc,plot.nme)
+png(filename=plot.store,height = png_height,width = png_height * aspect_ratio)
+dplot <- densityplot(imp_data)
+dplot
+dev.off()
 
 #apply to SOURCE_SUBSET
 SOURCE_SUBSET <- complete(imp_data)
 
-#stats on missing values (post-imputation)
+#stats on missing values (post-imputation). All gone!
 sapply(SOURCE_SUBSET, function(x) sum(is.na(x)))
 
 
@@ -469,28 +491,39 @@ md$md_bin
 
 #Plot outlier distribution by bin 
 plot.title = paste0('Outlier distribution * bin')
+plot.nme = paste0(ggd,'_outliers_distribution.png')
+plot.store <-paste0(plots.loc,plot.nme)
 
 outlier_dis <- ggplot(md, aes(x = md_bin)) +
   ggtitle(plot.title) +
   labs(x = "outlier bin") +
   geom_bar()
 outlier_dis
-
-plot.nme = paste0('Outliers_distribution.png')
-plot.store <-paste0(plots.loc,plot.nme)
 ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio)
 
 
 # Binary outlier variable
-# threshold determined by upper boundery of last-1 bin, see outlier distribution plot 
-threshold_zw <- 35.1 # Threshold 
+# threshold determined by lower boundery of last-1 bin, see outlier distribution plot 
+threshold_zw <- 36.3 # Threshold ZHZ : 36.3 , HvB : 35.1
 SOURCE_SUBSET$outlier <- "No"
 SOURCE_SUBSET$outlier[SOURCE_SUBSET$MD > threshold_zw] <- "Yes"  
 
 SOURCE_SUBSET$outlier_fac <- 0
 SOURCE_SUBSET$outlier_fac[SOURCE_SUBSET$MD > threshold_zw] <- 1 
-hist(SOURCE_SUBSET$outlier_fac)
 
+
+plot.title = paste0('Outliers')
+plot.nme = paste0(ggd,'_outliers.png')
+plot.store <-paste0(plots.loc,plot.nme)
+
+outlier_dich <- ggplot(md, aes(x = SOURCE_SUBSET$outlier_fac)) +
+  ggtitle(plot.title) +
+  labs(x = "outliers") +
+  geom_bar()
+outlier_dich
+ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio)
+
+save(SOURCE_SUBSET,file=paste0(data.loc,"SOURCE_SUBSET_INC_OUTLIERS",".Rda"))
 
 #remove outlier indicators
 ANALYSIS_SUBSET <- SOURCE_SUBSET[ which(SOURCE_SUBSET$MD < threshold_zw), ]
@@ -571,7 +604,7 @@ ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio)
 
 
 ## keeping original TSNE data
-tsne_original=d_tsne
+tsne_original <- d_tsne
 #head(tsne_original)
 
 
@@ -596,7 +629,7 @@ tsne_original=d_tsne
 
 #very important to determine the optimal number of clusters!
 #three methods: elbow, silhouette and GAP. We choose GAP here.
-plot.nme = paste0('clusters_n_',dest.nme.var,'_k',k,'_p',perplex,'.png')
+plot.nme = paste0(ggd, 'clusters_n_',dest.nme.var,'_k',k,'_p',perplex,'.png')
 plot.store <-paste0(plots.loc,plot.nme)
 
 # Elbow method
@@ -619,6 +652,8 @@ fviz_nbclust(d_tsne, kmeans, method = "gap_stat")+
 
 ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio)
 
+#reset?
+#k <- 8
 
 #-------------------------------------------------------------------------------
 # II.1 TSNE (DR) > kmeans (CL)
@@ -642,9 +677,10 @@ tsne_original$cl_kmeans <- as.factor(tsne_original$cl_kmeans)
 
 head(tsne_original,2)
 
+
 ## plotting the results with Kmeans clustering
 plot.title = paste0('TSNE > Kmeans of ',dest.nme.var, ' k=',k,' perplexity=',perplex)
-ggplot(tsne_original, aes(pos_x, pos_y, color = cl_kmeans)) +
+ggplot(tsne_original, aes(V1, V2, color = cl_kmeans)) +
         geom_point()   + 
         ggtitle(plot.title) +
 #geom_text(aes(label=row.names(X)),color="#ababab") +
@@ -653,7 +689,6 @@ geom_text(aes(label = ""), size = 3, vjust = 1, color = "black")
 plot.nme = paste0('tsne_kmeans_',dest.nme.var,'_k',k,'_p',perplex,'.png')
 plot.store <-paste0(plots.loc,plot.nme)
 ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio)
-
 
 
 #-------------------------------------------------------------------------------
@@ -776,23 +811,45 @@ head(tsne_original,2)
 #avg.silwidth is a measurement that considers how closely related objects 
 #are within the cluster and how clusters are separated from each other.
 
-#PAM 
 #Kmeans 
 cs1 = cluster.stats(dist(ANALYSIS_SUBSET),as.numeric(tsne_original$cl_kmeans))
-cs1[c("within.cluster.ss","avg.silwidth")]
+silwidth_kmeans <- cs1[c("within.cluster.ss","avg.silwidth")]
+silwidth_kmeans
 
+#PAM
 cs2 = cluster.stats(dist(ANALYSIS_SUBSET),as.numeric(tsne_original$cl_pam))
-cs2[c("within.cluster.ss","avg.silwidth")]
+silwidth_pam <- cs2[c("within.cluster.ss","avg.silwidth")]
+silwidth_pam
 
 #HCA 
 cs3 = cluster.stats(dist(ANALYSIS_SUBSET),as.numeric(tsne_original$cl_hierarchical))
-cs3[c("within.cluster.ss","avg.silwidth")]
+silwidth_hca <- cs3[c("within.cluster.ss","avg.silwidth")]
+silwidth_hca
 
+silwidth <- rbind(silwidth_kmeans,silwidth_pam,silwidth_hca)
+
+silwidth <- as.data.frame(silwidth)
+silwidth
 #hdbscan
 #cs3 = cluster.stats(dist(ANALYSIS_SUBSET),as.numeric(tsne_original$cl_hdbscan))
 #cs3[c("within.cluster.ss","avg.silwidth")]
 
 #we choose Kmeans 
+silwidth$within.cluster.ss <- as.numeric(silwidth$within.cluster.ss) 
+silwidth$methods <- row.names(silwidth)
+silwidth$methods <- as.factor(silwidth$methods)  
+#Plot outlier distribution by bin 
+plot.title = paste0('Measurement of consistency observations within cluster')
+plot.nme = paste0(ggd,'_within_cluster_ss.png')
+plot.store <-paste0(plots.loc,plot.nme)
+
+cluster_ss <- ggplot(silwidth, aes(x=methods, y = within.cluster.ss)) +
+  ggtitle(plot.title) +
+  labs(x = "Clustering method", y = "Within.cluster.ss (lower is better)") +
+  geom_boxplot()
+cluster_ss
+ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio)
+
 
 #-------------------------------------------------------------------------------
 # Writing cluster membership to csv
@@ -839,3 +896,4 @@ write_sav(z, final_sav)
 FINAL_DF <- z
 
 save(FINAL_DF,file=paste0(data.loc,"FINAL_DF",".Rda"))
+
