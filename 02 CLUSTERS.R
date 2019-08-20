@@ -18,7 +18,7 @@ cat("\014")
 #packages
 packages <- c("tools","here","tidyverse","naniar", "haven", "mice","VIM", "corrplot", "car", "nFactors", "psych", "caret", 
               "Rtsne", "cluster","dbscan", "dendextend", "fpc", "factoextra", "rpart", "rpart.plot","weights",
-              "ggplot2", "ggthemes", "qgraph", "gridExtra","randomForest","tidyr","dlookr", "aod", "janitor")
+              "ggplot2", "ggthemes", "qgraph", "gridExtra","randomForest","tidyr","dlookr", "aod", "janitor", "descr")
 #install packages which are not available
 has_available   <- packages %in% rownames(installed.packages())
 if(any(!has_available)) install.packages(packages[!has_available])
@@ -36,7 +36,8 @@ root <- getwd()
 root
 
 #GGD 
-ggd <- 'HVB' #Hart voor Brabant
+#ggd <- 'HVB' #Hart voor Brabant
+ggd <- 'ZHZ' #Zuid-Holland Zuid
 
 #set graphs location (if na, create directory first)
 plots.loc <- paste0(root,'/PLOTS/',ggd,'/')
@@ -48,7 +49,7 @@ data.loc <- paste0(root,'/DATA/',ggd,'/')
 lib.loc <- paste0(root,'/LIB/')
 
 #functions (make sure multimerge.R resides in the LIB directory)
-if(!exists("multimerge", mode="function")) source(paste0(lib.loc,"multimerge.R"),local = TRUE)
+#if(!exists("multimerge", mode="function")) source(paste0(lib.loc,"multimerge.R"),local = TRUE)
 
 #options
 set.seed(123)  # for reproducibility
@@ -70,7 +71,7 @@ f <- 4
 #distinct dimensions
 rotation <- "varimax"
 
-#clustering method
+#clustering method results (as input)
 clustering <- "kmeans"
 
 #dimension charts
@@ -79,19 +80,25 @@ graph_height <- 8
 png_height <- 600
 aspect_ratio <- 2
 
-#color scheme
-colors_cust <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+#custom color scheme
+colors_cust <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#ff0000", "#ababab")
 
 
 #-------------------------------------------------------------------------------
-# LOAD DATA 
+# LOAD DATA (result from procedure 01 'DIMENSION')
 
 load(file = paste0(data.loc,"FINAL_DF",".Rda"))
 z <- FINAL_DF
 
-#weegfactor vector
-wei_vec <- as.vector(z$weegfactor3) 
-wei_vec <- as.numeric(wei_vec)
+
+#-------------------------------------------------------------------------------
+# WEIGHT
+
+#weight variable vector (change name variable if needed into z$....)
+z$case_wei <- z$ewGGD
+
+z$case_wei <- as.numeric(as.character(z$case_wei))
+wei_vec <- as.vector(z$case_wei) 
 
 
 #-------------------------------------------------------------------------------
@@ -100,7 +107,7 @@ wei_vec <- as.numeric(wei_vec)
 #vulnerability distribution
 vulnerable_num <- as.numeric(z$vulnerable)
 
-vulnerable <- wpct(vulnerable_num, weight=wei_vec, na.rm=FALSE)
+vulnerable <- wpct(vulnerable_num, weight=wei_vec, na.rm=FALSE)*100
 print(vulnerable)
 
 write.table(vulnerable , file = paste0(data.loc,"weigthed_vulnerable_distribution_population",".csv"))
@@ -111,93 +118,26 @@ clusters <- z %>%
 
 cl_kmeans_num <- as.numeric(z$cl_kmeans)
 
-#Cluster membership distribution (weigthed) (n)
-plot.nme = paste0('cluster_',clustering,'_membership_distribution_weighted.png')
-plot.store <-paste0(plots.loc,plot.nme)
-png(filename=plot.store,height = png_height , width = png_height * aspect_ratio)
-wtd.hist(cl_kmeans_num, weight=wei_vec,freq = FALSE)
-dev.off()
+
+#clusters$cl_kmeans <- as.numeric(as.character(clusters$cl_kmeans))
+
 
 #Cluster membership distribution (weigthed) (pct)
-vulnerable_clus <- wpct(cl_kmeans_num, weight=wei_vec, na.rm=TRUE)
+vulnerable_clus <- wpct(cl_kmeans_num, weight=wei_vec, na.rm=FALSE)*100
+vulnerable_clus <- as.data.frame(vulnerable_clus)
+vulnerable_clus$cl_kmeans <- row.names(vulnerable_clus)
 
-write.table(vulnerable_clus , file = paste0(data.loc,"Weigthed_vulnerable_distribution_clusters_",clustering,".csv"))
-
-#Cluster membership distribution (unweigthed) (n)
-plot.title = paste0('cluster ',clustering,' membership distribution (unweigthed)')
-cluster_dis <- ggplot(clusters, aes(x = cl_kmeans)) +
+plot.title = paste0('cluster ',clustering,' membership distribution (weighted)')
+cluster_dis <-  ggplot(vulnerable_clus, aes(x =factor(cl_kmeans),y=vulnerable_clus)) +
   ggtitle(plot.title) +
-  labs(x = "cluster") +
-  geom_bar()
+  labs(x = "cluster", y="%") +
+    geom_bar(stat="identity", width = 0.7)
 cluster_dis
-plot.nme = paste0('Cluster_',clustering,'_membership_distribution_unweighted.png')
+plot.nme = paste0(ggd,'_cluster_',clustering,'_membership_distribution.png')
 plot.store <-paste0(plots.loc,plot.nme)
 ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio)
 
-
-#dispersion plots (of cases)
-#please note that the mean presented in the box plots is not weigthed
-#calculations of weighted means is done afterwards (see csv-file in DATA directory: weighted means of clusters)
-
-#leeftijd
-z$leeftijd <- as.numeric(z$leeftijd)
-
-plot.nme = paste0('cluster_',clustering,'_leeftijd.png')
-plot.store <-paste0(plots.loc,plot.nme)
-png(filename=plot.store,height = png_height , width = png_height * aspect_ratio)
-
-bp3 <- boxplot(leeftijd~cl_kmeans,data=z, main="Leeftijd * cluster",
-               xlab="cluster", ylab="leeftijd") 
-bp3
-dev.off()
-
-#samenloop / multi-problematiek
-z$samenloop <- as.numeric(z$samenloop)
-
-plot.nme = paste0('cluster_',clustering,'_samenloop.png')
-plot.store <-paste0(plots.loc,plot.nme)
-png(filename=plot.store,height = png_height , width = png_height * aspect_ratio)
-
-bp4 <- boxplot(samenloop~cl_kmeans,data=z, main="samenloop * cluster",
-               xlab="cluster", ylab="samenloop") 
-bp4
-dev.off()
-
-#anst en depressie
-z$GGADS201 <- as.numeric(z$GGADS201)
-plot.nme = paste0('cluster_',clustering,'_angstdepressie.png')
-plot.store <-paste0(plots.loc,plot.nme)
-png(filename=plot.store,height = png_height , width = png_height * aspect_ratio)
-
-bp5 <- boxplot(GGADS201~cl_kmeans,data=z, main="Risico op angst en depressie * cluster",
-               xlab="cluster", ylab="risico op angst en depressie") 
-bp5
-dev.off()
-
-#regie op het leven
-#score 7 t/m 19: onvoldoende eigen regie
-z$GGRLS202 <- as.numeric(z$GGRLS202)
-plot.nme = paste0('cluster_',clustering,'_regieopleven.png')
-plot.store <-paste0(plots.loc,plot.nme)
-png(filename=plot.store,height = png_height , width = png_height * aspect_ratio)
-
-bp6 <- boxplot(GGRLS202~cl_kmeans,data=z, main="Regie op het leven * cluster",
-               xlab="cluster", ylab="regie op het leven") 
-bp6
-dev.off()
-
-#eenzaamheid
-#ernstig eenzaam (9-10) en zeer ernstig eenzaam (11)
-z$GGEES203 <- as.numeric(z$GGEES203)
-plot.nme = paste0('cluster_',clustering,'_eenzaamheid.png')
-plot.store <-paste0(plots.loc,plot.nme)
-png(filename=plot.store,height = png_height , width = png_height * aspect_ratio)
-
-bp7 <- boxplot(GGEES203~cl_kmeans,data=z, main="Eenzaamheid * cluster",
-               xlab="cluster", ylab="eenzaamheid") 
-bp7
-dev.off()
-
+write.table(vulnerable_clus , file = paste0(data.loc,"weigthed_vulnerable_distribution_clusters_",clustering,".csv"))
 
 
 #-------------------------------------------------------------------------------
@@ -207,50 +147,163 @@ dev.off()
 #-------------------------------------------------------------------------------
 
 
+
 qs <- z
-cols_report <- c("cl_kmeans", "weegfactor3", "GGEES203", "GGRLS202", "GGADS201", "leeftijd", "samenloop") 
+cols_report <- c("cl_kmeans", "case_wei", "GGEES203", "GGRLS202", "GGADS201", "leeftijd", "samenloop") 
 qs_s <- qs[,cols_report]
 
 qs_s[] <- lapply(qs_s, function(x) {
   if(is.factor(x)) as.numeric(as.character(x)) else x
 })
 
-#weighted means of age and outcome * cluster 
+#calculations of weighted means
 a <- qs_s %>%
   na.omit(cl_kmeans) %>%
   mutate(as.factor(cl_kmeans))  %>%
   group_by(cl_kmeans) %>%
   summarise(
-    leeftijd_w = weighted.mean(leeftijd, weegfactor3),
-    samenloop_w = weighted.mean(samenloop, weegfactor3),
-    eenzaam_w = weighted.mean(GGEES203, weegfactor3),
-    regie_w = weighted.mean(GGRLS202, weegfactor3),
-    depri_w = weighted.mean(GGADS201, weegfactor3)
+    leeftijd_w = weighted.mean(leeftijd, case_wei),
+    samenloop_w = weighted.mean(samenloop, case_wei),
+    eenzaam_w = weighted.mean(GGEES203, case_wei),
+    regie_w = weighted.mean(GGRLS202, case_wei),
+    depri_w = weighted.mean(GGADS201, case_wei)
   )
 
 print(a)
 
 write.table(a , file = paste0(data.loc,"Weigthed_means_outcome_clusters_kmeans",".csv"))
 
+#dispersion plots 
+#please note that the weighted mean presented in the box plots is indicated by the red star
+
+#leeftijd
+#z$leeftijd <- as.numeric(z$leeftijd)
+z$leeftijd <- as.numeric(z$LFT0109)
+
+
+plot.nme = paste0(ggd,'_cluster_',clustering,'_leeftijd.png')
+plot.store <-paste0(plots.loc,plot.nme)
+png(filename=plot.store,height = png_height , width = png_height * aspect_ratio)
+
+#bp3 <- boxplot(leeftijd~cl_kmeans,data=z, main="Leeftijd * cluster",
+ #              xlab="cluster", ylab="leeftijd") 
+
+bp3 <- ggplot(z, aes(x = factor(cl_kmeans), y = leeftijd, weight = case_wei), na.rm=TRUE) + 
+  geom_boxplot(width=0.6,  colour = I("#3366FF")) + 
+  geom_point(data=a,aes(x=factor(cl_kmeans),y=leeftijd_w),shape = 23, size = 3, fill ="red",inherit.aes=FALSE)
+
+bp3
+dev.off()
+
+
+
+
+#samenloop / multi-problematiek
+z$samenloop <- as.numeric(z$samenloop)
+
+plot.nme = paste0(ggd,'_cluster_',clustering,'_samenloop.png')
+plot.store <-paste0(plots.loc,plot.nme)
+png(filename=plot.store,height = png_height , width = png_height * aspect_ratio)
+
+bp4 <- ggplot(z, aes(x = factor(cl_kmeans), y = samenloop, weight = case_wei),na.rm=TRUE) + 
+  geom_boxplot(width=0.6,  colour = I("#3366FF")) +
+  geom_point(data=a,aes(x=factor(cl_kmeans),y=samenloop_w),shape = 23, size = 3, fill ="red",inherit.aes=FALSE)
+
+bp4
+
+dev.off()
+
+
+
+#anst en depressie
+z$GGADS201 <- as.numeric(z$GGADS201)
+plot.nme = paste0(ggd,'_cluster_',clustering,'_angstdepressie.png')
+plot.store <-paste0(plots.loc,plot.nme)
+png(filename=plot.store,height = png_height , width = png_height * aspect_ratio)
+
+bp5 <- ggplot(z, aes(x = factor(cl_kmeans), y = GGADS201, weight = case_wei, ylab('angst en depressie')),na.rm=TRUE) + 
+  geom_boxplot(width=0.6,  colour = I("#3366FF")) +
+  geom_point(data=a,aes(x=factor(cl_kmeans),y=depri_w),shape = 23, size = 3, fill ="red",inherit.aes=FALSE)
+
+bp5
+
+
+dev.off()
+
+
+
+
+#regie op het leven
+#score 7 t/m 19: onvoldoende eigen regie
+z$GGRLS202 <- as.numeric(z$GGRLS202)
+plot.nme = paste0(ggd,'_cluster_',clustering,'_regieopleven.png')
+plot.store <-paste0(plots.loc,plot.nme)
+png(filename=plot.store,height = png_height , width = png_height * aspect_ratio)
+
+bp6 <- ggplot(z, aes(x = factor(cl_kmeans), y = GGRLS202, weight = case_wei, ylab('regie op het leven')),na.rm=TRUE) + 
+  geom_boxplot(width=0.6,  colour = I("#3366FF")) +
+  geom_point(data=a,aes(x=factor(cl_kmeans),y=regie_w),shape = 23, size = 3, fill ="red",inherit.aes=FALSE)
+
+bp6
+
+
+dev.off()
+
+
+
+#eenzaamheid
+#ernstig eenzaam (9-10) en zeer ernstig eenzaam (11)
+z$GGEES203 <- as.numeric(z$GGEES203)
+plot.nme = paste0(ggd,'_cluster_',clustering,'_eenzaamheid.png')
+plot.store <-paste0(plots.loc,plot.nme)
+png(filename=plot.store,height = png_height , width = png_height * aspect_ratio)
+
+bp7 <- ggplot(z, aes(x = factor(cl_kmeans), y = GGEES203, weight = case_wei, ylab('eenzaamheid')),na.rm=TRUE) + 
+  geom_boxplot(width=0.6,  colour = I("#3366FF")) +
+  geom_point(data=a,aes(x=factor(cl_kmeans),y=eenzaam_w),shape = 23, size = 3, fill ="red",inherit.aes=FALSE)
+
+bp7
+
+dev.off()
+
+
+
+
+
+
+
+
+library(descr)
+
+ct <- qs %>%
+  na.omit(cl_kmeans)
 
 #crosstab incidentie eenzaamheid
-ct_eenzaamheid <- qs %>% 
-  crosstab(cl_kmeans,GGEES208) %>% 
-  adorn_crosstab("row") 
+ct_eenzaamheid <- crosstab(ct$cl_kmeans, ct$GGEES208, weight = ct$case_wei,chisq = TRUE,cell.layout = TRUE,
+               dnn = c("cluster", "Eenzaamheid"),
+               expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE)
 ct_eenzaamheid
 
 
-#crosstab mantelzorg verlenen
-ct_mz <- qs %>% 
-  crosstab(cl_kmeans,MCMZGA205) %>% 
-  adorn_crosstab("row") 
+
+#crosstab incidentie mantelzorg geven
+ct_mz <- crosstab(ct$cl_kmeans, ct$MCMZGA205, weight = ct$case_wei,chisq = TRUE,cell.layout = TRUE,
+                           dnn = c("cluster", "Mantelzorg verlenen"),
+                           expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE)
 ct_mz
+
+
 
 
 #crosstab mantelzorg intensiteit
 ct_mz_int <- qs %>% 
   crosstab(cl_kmeans,MCMZGA201) %>% 
   adorn_crosstab("row") 
+ct_mz_int
+
+ct_mz_int <- crosstab(ct$cl_kmeans, ct$MCMZGA201, weight = ct$case_wei,chisq = TRUE,cell.layout = TRUE,
+                  dnn = c("cluster", "Mantelzorg itensiteit"),
+                  expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE)
 ct_mz_int
 
 
