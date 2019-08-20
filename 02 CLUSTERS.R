@@ -94,7 +94,7 @@ z <- FINAL_DF
 #-------------------------------------------------------------------------------
 # WEIGHT
 
-#weight variable vector (change name variable if needed into z$....)
+#weight variable (change name variable 'z$ewGGD' if needed into 'z$....')
 z$case_wei <- z$ewGGD
 
 z$case_wei <- as.numeric(as.character(z$case_wei))
@@ -110,17 +110,13 @@ vulnerable_num <- as.numeric(z$vulnerable)
 vulnerable <- wpct(vulnerable_num, weight=wei_vec, na.rm=FALSE)*100
 print(vulnerable)
 
-write.table(vulnerable , file = paste0(data.loc,"weigthed_vulnerable_distribution_population",".csv"))
+write.table(vulnerable, file = paste0(data.loc,"weigthed_vulnerable_distribution_population",".csv"))
 
 #cluster cl_kmeans membership distribution
 clusters <- z %>%
   subset(!is.na(cl_kmeans),select = c(cl_kmeans)) 
 
-cl_kmeans_num <- as.numeric(z$cl_kmeans)
-
-
-#clusters$cl_kmeans <- as.numeric(as.character(clusters$cl_kmeans))
-
+cl_kmeans_num <- as.numeric(clusters$cl_kmeans)
 
 #Cluster membership distribution (weigthed) (pct)
 vulnerable_clus <- wpct(cl_kmeans_num, weight=wei_vec, na.rm=FALSE)*100
@@ -137,7 +133,7 @@ plot.nme = paste0(ggd,'_cluster_',clustering,'_membership_distribution.png')
 plot.store <-paste0(plots.loc,plot.nme)
 ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio)
 
-write.table(vulnerable_clus , file = paste0(data.loc,"weigthed_vulnerable_distribution_clusters_",clustering,".csv"))
+write.table(vulnerable_clus , file = paste0(data.loc,"weighted_vulnerable_distribution_clusters_",clustering,".csv"))
 
 
 #-------------------------------------------------------------------------------
@@ -147,22 +143,21 @@ write.table(vulnerable_clus , file = paste0(data.loc,"weigthed_vulnerable_distri
 #-------------------------------------------------------------------------------
 
 
-
 qs <- z
-cols_report <- c("cl_kmeans", "case_wei", "GGEES203", "GGRLS202", "GGADS201", "leeftijd", "samenloop") 
+cols_report <- c("cl_kmeans", "case_wei", "GGEES203", "GGRLS202", "GGADS201", "LFT0109", "samenloop") 
 qs_s <- qs[,cols_report]
 
 qs_s[] <- lapply(qs_s, function(x) {
   if(is.factor(x)) as.numeric(as.character(x)) else x
 })
 
-#calculations of weighted means
+#weighted means of outcome * cluster
 a <- qs_s %>%
   na.omit(cl_kmeans) %>%
   mutate(as.factor(cl_kmeans))  %>%
   group_by(cl_kmeans) %>%
   summarise(
-    leeftijd_w = weighted.mean(leeftijd, case_wei),
+    leeftijd_w = weighted.mean(LFT0109, case_wei),
     samenloop_w = weighted.mean(samenloop, case_wei),
     eenzaam_w = weighted.mean(GGEES203, case_wei),
     regie_w = weighted.mean(GGRLS202, case_wei),
@@ -173,29 +168,42 @@ print(a)
 
 write.table(a , file = paste0(data.loc,"Weigthed_means_outcome_clusters_kmeans",".csv"))
 
+
+
+#Cluster membership * municipality
+qg <- z
+cols_geo <- c("cl_kmeans", "case_wei", "Gemeentecode") 
+qg_s <- qg[,cols_geo]
+
+gem <- qg_s %>%
+  na.omit(cl_kmeans) %>%
+  mutate(as.factor(cl_kmeans))
+gem
+
+#crosstab incidentie clusters * gemeente
+ct_gemeente <- crosstab(gem$Gemeentecode, gem$cl_kmeans, weight = gem$case_wei,chisq = TRUE,cell.layout = TRUE,
+                           dnn = c("gemeente","cluster"),
+                           expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE )
+ct_gemeente
+
+
+
+
 #dispersion plots 
-#please note that the weighted mean presented in the box plots is indicated by the red star
+#please note that the weighted mean presented in the box plots is indicated by the red dot
 
 #leeftijd
 #z$leeftijd <- as.numeric(z$leeftijd)
 z$leeftijd <- as.numeric(z$LFT0109)
 
-
 plot.nme = paste0(ggd,'_cluster_',clustering,'_leeftijd.png')
 plot.store <-paste0(plots.loc,plot.nme)
 png(filename=plot.store,height = png_height , width = png_height * aspect_ratio)
-
-#bp3 <- boxplot(leeftijd~cl_kmeans,data=z, main="Leeftijd * cluster",
- #              xlab="cluster", ylab="leeftijd") 
-
 bp3 <- ggplot(z, aes(x = factor(cl_kmeans), y = leeftijd, weight = case_wei), na.rm=TRUE) + 
   geom_boxplot(width=0.6,  colour = I("#3366FF")) + 
   geom_point(data=a,aes(x=factor(cl_kmeans),y=leeftijd_w),shape = 23, size = 3, fill ="red",inherit.aes=FALSE)
-
 bp3
 dev.off()
-
-
 
 
 #samenloop / multi-problematiek
@@ -204,51 +212,38 @@ z$samenloop <- as.numeric(z$samenloop)
 plot.nme = paste0(ggd,'_cluster_',clustering,'_samenloop.png')
 plot.store <-paste0(plots.loc,plot.nme)
 png(filename=plot.store,height = png_height , width = png_height * aspect_ratio)
-
 bp4 <- ggplot(z, aes(x = factor(cl_kmeans), y = samenloop, weight = case_wei),na.rm=TRUE) + 
   geom_boxplot(width=0.6,  colour = I("#3366FF")) +
   geom_point(data=a,aes(x=factor(cl_kmeans),y=samenloop_w),shape = 23, size = 3, fill ="red",inherit.aes=FALSE)
-
 bp4
-
 dev.off()
-
 
 
 #anst en depressie
 z$GGADS201 <- as.numeric(z$GGADS201)
+
 plot.nme = paste0(ggd,'_cluster_',clustering,'_angstdepressie.png')
 plot.store <-paste0(plots.loc,plot.nme)
 png(filename=plot.store,height = png_height , width = png_height * aspect_ratio)
-
 bp5 <- ggplot(z, aes(x = factor(cl_kmeans), y = GGADS201, weight = case_wei, ylab('angst en depressie')),na.rm=TRUE) + 
   geom_boxplot(width=0.6,  colour = I("#3366FF")) +
   geom_point(data=a,aes(x=factor(cl_kmeans),y=depri_w),shape = 23, size = 3, fill ="red",inherit.aes=FALSE)
-
 bp5
-
-
 dev.off()
-
-
 
 
 #regie op het leven
 #score 7 t/m 19: onvoldoende eigen regie
 z$GGRLS202 <- as.numeric(z$GGRLS202)
+
 plot.nme = paste0(ggd,'_cluster_',clustering,'_regieopleven.png')
 plot.store <-paste0(plots.loc,plot.nme)
 png(filename=plot.store,height = png_height , width = png_height * aspect_ratio)
-
 bp6 <- ggplot(z, aes(x = factor(cl_kmeans), y = GGRLS202, weight = case_wei, ylab('regie op het leven')),na.rm=TRUE) + 
   geom_boxplot(width=0.6,  colour = I("#3366FF")) +
   geom_point(data=a,aes(x=factor(cl_kmeans),y=regie_w),shape = 23, size = 3, fill ="red",inherit.aes=FALSE)
-
 bp6
-
-
 dev.off()
-
 
 
 #eenzaamheid
@@ -268,12 +263,6 @@ dev.off()
 
 
 
-
-
-
-
-
-library(descr)
 
 ct <- qs %>%
   na.omit(cl_kmeans)
@@ -296,15 +285,13 @@ ct_mz
 
 
 #crosstab mantelzorg intensiteit
-ct_mz_int <- qs %>% 
-  crosstab(cl_kmeans,MCMZGA201) %>% 
-  adorn_crosstab("row") 
-ct_mz_int
-
 ct_mz_int <- crosstab(ct$cl_kmeans, ct$MCMZGA201, weight = ct$case_wei,chisq = TRUE,cell.layout = TRUE,
-                  dnn = c("cluster", "Mantelzorg itensiteit"),
+                  dnn = c("cluster", "Mantelzorg intensiteit"),
                   expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE)
 ct_mz_int
+
+
+
 
 
 #ervaren gezondheid
@@ -400,7 +387,7 @@ etni
 
 #Perspective : SES, situational
 #leeftijd70eo leeftijd 70 en ouder 
-#gez_slecht gezondheid slecht 
+#ervarengezondheid_dich gezondheid slecht 
 #inkomenlaag_dich inkomen laag
 #dagactiviteit betaald werk, vrijwilligerswerk, student 
 #geenbetaaldwerk geen betaald werk
@@ -409,7 +396,7 @@ etni
 #MCMZOS304 mantelzorg ontvangen laatste 12 maanden
 #MCMZGA205 mantelzorg gegeven laatste 12 maanden
 
-dim_var <- c("cl_kmeans","leeftijd70eo","gez_slecht","inkomenlaag_dich", "dagactiviteit","geenbetaaldwerk",
+dim_var <- c("cl_kmeans","leeftijd70eo","ervarengezondheid_dich","inkomenlaag_dich", "dagactiviteit",
              "opl_lm", "ziek_lt", "MCMZOS304", "MCMZGA205") 
 
 #relevant variables for PCA
@@ -429,12 +416,25 @@ sit <- sit[ which(sit$cl_kmeans>0), ]
 sapply(sit, function(x) sum(is.na(x)))
 
 
+
 #missing data imputation
 #method : Multivariate Imputation via Chained Equations, logreg(Logistic Regression) for binary variables
-imp2_data <- mice(sit,m=5,maxit=30,meth='logreg',seed=500)
-summary(imp2_data)
 
-sit <- complete(imp2_data,1)
+#initial run to auto-determine powerful predictors for imputation
+ini <- mice(sit,pred=quickpred(sit, mincor=.3),seed=500, print=F)
+#predictor matrix
+(pred <- ini$pred)
+
+save(pred, file = "prediction_matrix_situational.RData")
+
+#pred <- load("prediction_matrix_situational.RData")
+
+#final run
+imp_data <- mice(sit,method = "logreg", pred=pred,m=5,maxit=30,seed=500, print=T)
+
+summary(imp_data)
+
+sit <- complete(imp_data,1)
 
 
 #stats on missing values (post-imputation)
@@ -447,7 +447,7 @@ dim(sit)
 for(i in 1:k) {
 
 #manual cluster number 
-#i <- 1
+i <- 1
 #filter by cluster number  
 v <-subset(sit,cl_kmeans==i)
 
