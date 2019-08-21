@@ -102,9 +102,8 @@ wei_vec <- as.vector(z$case_wei)
 
 
 #-------------------------------------------------------------------------------
-#Clusters * leeftijd, * higher-order outcome indicators
+# Cluster membership distribution
 
-#vulnerability distribution
 vulnerable_num <- as.numeric(z$vulnerable)
 
 vulnerable <- wpct(vulnerable_num, weight=wei_vec, na.rm=FALSE)*100
@@ -137,11 +136,10 @@ write.table(vulnerable_clus , file = paste0(data.loc,"weighted_vulnerable_distri
 
 
 #-------------------------------------------------------------------------------
-# IV WEIGHTED SCORES PER CLUSTER
+# WEIGHTED SCORES PER CLUSTER
 
 
 #-------------------------------------------------------------------------------
-
 
 qs <- z
 cols_report <- c("cl_kmeans", "case_wei", "GGEES203", "GGRLS202", "GGADS201", "LFT0109", "samenloop") 
@@ -166,6 +164,8 @@ a <- qs_s %>%
 
 print(a)
 
+
+
 write.table(a , file = paste0(data.loc,"Weigthed_means_outcome_clusters_kmeans",".csv"))
 
 
@@ -187,9 +187,13 @@ ct_gemeente <- crosstab(gem$Gemeentecode, gem$cl_kmeans, weight = gem$case_wei,c
 ct_gemeente
 
 
+#-------------------------------------------------------------------------------
+# Dispersion plots 
 
 
-#dispersion plots 
+#-------------------------------------------------------------------------------
+
+
 #please note that the weighted mean presented in the box plots is indicated by the red dot
 
 #leeftijd
@@ -262,15 +266,21 @@ bp7
 dev.off()
 
 
+#-------------------------------------------------------------------------------
+# Crosstabs
 
 
-ct <- qs %>%
+#-------------------------------------------------------------------------------
+
+
+
+ct <- z %>%
   na.omit(cl_kmeans)
 
 #crosstab incidentie eenzaamheid
 ct_eenzaamheid <- crosstab(ct$cl_kmeans, ct$GGEES208, weight = ct$case_wei,chisq = TRUE,cell.layout = TRUE,
                dnn = c("cluster", "Eenzaamheid"),
-               expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE)
+               expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
 ct_eenzaamheid
 
 
@@ -278,17 +288,16 @@ ct_eenzaamheid
 #crosstab incidentie mantelzorg geven
 ct_mz <- crosstab(ct$cl_kmeans, ct$MCMZGA205, weight = ct$case_wei,chisq = TRUE,cell.layout = TRUE,
                            dnn = c("cluster", "Mantelzorg verlenen"),
-                           expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE)
+                  expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
 ct_mz
 
 
 
-
 #crosstab mantelzorg intensiteit
-ct_mz_int <- crosstab(ct$cl_kmeans, ct$MCMZGA201, weight = ct$case_wei,chisq = TRUE,cell.layout = TRUE,
-                  dnn = c("cluster", "Mantelzorg intensiteit"),
-                  expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE)
-ct_mz_int
+#ct_mz_int <- crosstab(ct$cl_kmeans, ct$MCMZGA201, weight = ct$case_wei,chisq = TRUE,cell.layout = TRUE,
+#                  dnn = c("cluster", "Mantelzorg intensiteit"),
+#                  expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
+#ct_mz_int
 
 
 
@@ -296,63 +305,71 @@ ct_mz_int
 
 #ervaren gezondheid
 #3 is slecht of zeer slecht
-gez <- qs %>% 
-  crosstab(cl_kmeans,KLGGA207) %>% 
-  adorn_crosstab("row") 
+
+gez <- crosstab(ct$cl_kmeans, ct$KLGGA207, weight = ct$case_wei,chisq = TRUE,cell.layout = TRUE,
+                      dnn = c("cluster", "Ervaren gezondheid"),
+                      expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
 gez
 
 
+
+
 #heeft langdurig last van ziekte of aandoening
-chron <- qs %>% 
-  crosstab(cl_kmeans,CALGA260) %>% 
-  adorn_crosstab("row") 
+chron <- crosstab(ct$cl_kmeans, ct$CALGA260, weight = ct$case_wei,chisq = TRUE,cell.layout = TRUE,
+                dnn = c("cluster", "Langdurige ziekte of aandoening"),
+                expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
 chron
 
 
-#gest. hh inkomen in kwintielen
+
+
+#gest. hh inkomen in kwintielen ct$inkkwin_2016 or KwintielInk
 #lager is slechter
-ink <- qs %>% 
-  crosstab(cl_kmeans,inkkwin_2016) %>% 
-  adorn_crosstab("row") 
+ink <- crosstab(ct$cl_kmeans, ct$KwintielInk, weight = ct$case_wei,chisq = TRUE,cell.layout = TRUE,
+                  dnn = c("cluster", "Inkomen huishouden"),
+                  expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
 ink
+
 
 #moeite met rondkomen
 #4 = grote moeite
-rk <- qs %>% 
-  crosstab(cl_kmeans,MMIKB201) %>% 
-  adorn_crosstab("row") 
+
+rk <- crosstab(ct$cl_kmeans, ct$MMIKB201, weight = ct$case_wei,chisq = TRUE,cell.layout = TRUE,
+                dnn = c("cluster", "Moeite met rondkomen"),
+                expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
 rk
 
 
+
+
+
 #werkloos en werkzoekend
-wkl <- qs %>% 
-  crosstab(cl_kmeans,MMWSA207) %>% 
-  adorn_crosstab("row") 
+wkl <- crosstab(ct$cl_kmeans, ct$MMWSA207, weight = ct$case_wei,chisq = TRUE,cell.layout = TRUE,
+               dnn = c("cluster", "Werkloos en werkzoekend"),
+               expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
 wkl
 
 
+
 #pensioen
-pen <- qs %>% 
-  crosstab(cl_kmeans,MMWSA206) %>% 
-  adorn_crosstab("row") 
+pen <- crosstab(ct$cl_kmeans, ct$MMWSA206, weight = ct$case_wei,chisq = TRUE,cell.layout = TRUE,
+                dnn = c("cluster", "Pensioen"),
+                expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
 pen
 
 
+
+
 #huisvrouw/-man
-huis <- qs %>% 
-  crosstab(cl_kmeans,MMWSA210) %>% 
-  adorn_crosstab("row") 
+huis <- crosstab(ct$cl_kmeans, ct$MMWSA210, weight = ct$case_wei,chisq = TRUE,cell.layout = TRUE,
+                dnn = c("cluster", "Huisvrouw/-man"),
+                expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
 huis
 
 
-#ethnicity
-etni <- qs %>% 
-  crosstab(cl_kmeans,etnicat) %>% 
-  adorn_crosstab("row") 
-etni
 
 
-#todo: rewrite this part above with assign function
+
 
 
 #-------------------------------------------------------------------------------
@@ -447,7 +464,7 @@ dim(sit)
 for(i in 1:k) {
 
 #manual cluster number 
-i <- 1
+#i <- 1
 #filter by cluster number  
 v <-subset(sit,cl_kmeans==i)
 
