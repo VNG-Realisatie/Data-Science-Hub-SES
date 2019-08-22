@@ -305,11 +305,11 @@ samenloop <- as.data.frame(samenloop)
 zw <- cbind(GEO,samenloop)
 zw <- zw[,c("volgnummer","samenloop")] 
 
-#determine base level of 'zorgwekkend' (score_sw) and 'gebrek aan regie' (GGADS201_dich) by (natural) binning
+#determine base level of 'samenloop' (score_sw) and 'angst en depressie' (GGADS201_dich) by (natural) binning
 #based on population
 bin_outcome <- SOURCE_SUBSET %>%
   mutate(zw_bin = binning(SOURCE_SUBSET$score_zw),
-         rg_bin = binning(SOURCE_SUBSET$GGADS201_dich)
+         dep_bin = binning(SOURCE_SUBSET$GGADS201_dich)
          )
 
 #regie en samenloop
@@ -322,13 +322,13 @@ bp1 <- boxplot(GGADS201_dich~zw_bin,data=bin_outcome, main="Gebrek aan regie * s
 bp1
 dev.off()
 
-#samenloop en regie
-plot.nme = paste0(ggd,'_explore_samenloop_regie.png')
+#samenloop en angst & depressie
+plot.nme = paste0(ggd,'_explore_samenloop_angstdepressie.png')
 plot.store <-paste0(plots.loc,plot.nme)
 png(filename=plot.store,height = png_height,width = png_height * aspect_ratio)
-bp2 <- boxplot(score_zw~rg_bin,data=bin_outcome, main="Samenloop * gebrek aan regie",
+bp2 <- boxplot(score_zw~dep_bin,data=bin_outcome, main="Samenloop * angst en depressie",
               xlab="level of gebrek aan regie", ylab="samenloop", staplewex = 1) 
-#text(x=fivenum(score_zw), labels =fivenum(score_zw), y=1.25)
+
 bp2
 dev.off()
 
