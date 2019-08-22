@@ -4,6 +4,7 @@
 # script 2/4
 # scope : Kmeans cluster definition and -loading
 # techniques : Principal component (PCA), aggregating, plotting
+# requirements: R Statistics version  (3.60=<)
 # author : Mark Henry Gremmen, in cooperation with Gemma Smulders
 # DataScienceHub @ JADS, GGD Hart voor Brabant
 # lud 2019-08-22
@@ -35,7 +36,7 @@ sessionInfo()
 root <- getwd()
 root
 
-#GGD 
+#GGD dep.
 #ggd <- 'HVB' #Hart voor Brabant
 ggd <- 'ZHZ' #Zuid-Holland Zuid
 
@@ -71,7 +72,6 @@ rotation <- "varimax"
 clustering <- "kmeans"
 
 #dimension charts
-#height <- 7
 graph_height <- 8
 png_height <- 600
 aspect_ratio <- 2

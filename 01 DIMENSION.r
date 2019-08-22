@@ -5,9 +5,10 @@
 # scope : dimension reduction and clustering
 # tecniques: imputation (IM), outlier analysis (OU), dimensional reduction (DR), clustering (CL), 
 # approach: unsupervised
+# requirements: R Statistics version  (3.60=<)
 # author : Mark Henry Gremmen, in cooperation with Gemma Smulders
 # DataScienceHub @ JADS, GGD Hart voor Brabant
-# lud 2019-08-16
+# lud 2019-08-22
 #-------------------------------------------------------------------------------
 
 #clear environment
@@ -36,7 +37,7 @@ sessionInfo()
 root <- getwd()
 root
 
-#GGD 
+#GGD dep.
 #ggd <- 'HVB' #Hart voor Brabant
 ggd <- 'ZHZ' #ZuidHollandZuid
 
@@ -72,11 +73,7 @@ k <- 8
 #value between 30 and 50 is usually fine
 perplex <- 40
 
-#number of factors (PCA)
-#f <- 4
-
 #dimension charts
-#height <- 7
 graph_height <- 8
 png_height <- 600
 aspect_ratio <- 2
@@ -154,30 +151,31 @@ GEO$GGD <- ggd
 #DATA PREPARATION
 
 #HIGH-ORDER OUTCOME VARIABLES (as proxy for vulnerability) 
-#eenzaamheid_dich : (zeer) ernstig eenzaam (dichitoom)
-#regie_dich : onvoldoende regie over eigen leven (dichitoom)
-#GGADA202 : (mid-)Matig of hoog risico op angststoornis of depressie (dichitoom)
-#ervarengezondheid_dich ; (zeer) slechte gezondheid (dichitoom)
+#
+#eenzaamheid_dich : (zeer) ernstig eenzaam (dichotoom)
+#regie_dich : onvoldoende regie over eigen leven (dichotoom)
+#GGADA202 : (mid-)Matig of hoog risico op angststoornis of depressie (dichotoom)
+#ervarengezondheid_dich ; (zeer) slechte gezondheid (dichotoom)
 #score_zw : hoge samenloop (op onderstaande items) (will be created on-the-fly) 
 
 #FEATURES (20 vars)
 
 #gezondheid en beperkingen - 5 vars 
-#CALGA260 : Heeft langdurige ziekte(n) of aandoening(en) (dichitoom)
-#CALGA261 : Is (ernstig) beperkt in activiteiten vanwege gezondheid (dichitoom)
+#CALGA260 : Heeft langdurige ziekte(n) of aandoening(en) (dichotoom)
+#CALGA261 : Is (ernstig) beperkt in activiteiten vanwege gezondheid (dichotoom)
 #LGBPS209 : Heeft minimaal een beperking met horen, zien of mobiliteit (ofwel minimaal grote moeite met 1 vd 7 OECD items)
 #AGGWS205 : Obesitas, ofwel een BMI van 30 of hoger
-#MMIKB201 : moeite met rondkomen (nog dischitomiseren)
+#MMIKB201 : moeite met rondkomen (nog dichotomiseren)
 
 #proxy eenzaamheid - 5 vars
-#GGEEB201 : !Kan praten over dagelijkse problemen (nog dischitomiseren)
+#GGEEB201 : !Kan praten over dagelijkse problemen (nog dischotomiseren)
 #GGEEB203 : Ervaar leegte (nog dischitomiseren)
-#GGEEB204 : !mensen om op terug te vallen bij narigheid (nog dischitomiseren)
+#GGEEB204 : !mensen om op terug te vallen bij narigheid (nog dischotomiseren)
 #GGEEB207 : !Veel mensen om op te vertrouwen (nog dischitomiseren)
-#GGEEB208 : !Voldoende mensen waarmee verbondenheid is (nog dischitomiseren)
+#GGEEB208 : !Voldoende mensen waarmee verbondenheid is (nog dischotomiseren)
 
 #zinvolle dagbesteding - 1 var
-#dagactiviteit : !betaald werk, vrijwilligerswerk, student (dichitoom)
+#dagactiviteit : !betaald werk, vrijwilligerswerk, student (dichotoom)
 
 #proxy regie op het leven - 4 vars
 #GGRLB201 : Weinig controle over dingen die mij overkomen
@@ -186,11 +184,11 @@ GEO$GGD <- ggd
 #GGRLB206 : Wat er in de toekomst met me gebeurt hangt voor grootste deel van mezelf af
 
 #proxy voor angst en depressie (categorical) - 5 vars
-#GGADB201 : Hoe vaak vermoeid zonder duidelijke reden? (nog dischitomiseren)
-#GGADB202 : Hoe vaak zenuwachtig? (nog dischitomiseren)
-#GGADB204 : Hoe vaak hopeloos? (nog dischitomiseren)
-#GGADB207 : Hoe vaak somber of depressief? (nog dischitomiseren)
-#GGADB210 : Hoe vaak afkeurenswaardig, minderwaardig of waardeloos? (nog dischitomiseren)
+#GGADB201 : Hoe vaak vermoeid zonder duidelijke reden? (nog dischotomiseren)
+#GGADB202 : Hoe vaak zenuwachtig? (nog dischotomiseren)
+#GGADB204 : Hoe vaak hopeloos? (nog dischotomiseren)
+#GGADB207 : Hoe vaak somber of depressief? (nog dischotomiseren)
+#GGADB210 : Hoe vaak afkeurenswaardig, minderwaardig of waardeloos? (nog dischotomiseren)
 
 #create new recoded variables
 #ervarengezondheid_dich 1 '(zeer) slecht' 0 'matig tot (zeer) goed)'
@@ -317,7 +315,7 @@ plot.nme = paste0(ggd,'_explore_regie_samenloop.png')
 plot.store <-paste0(plots.loc,plot.nme)
 png(filename=plot.store,height = png_height,width = png_height * aspect_ratio)
 
-bp1 <- boxplot(GGADS201_dich~zw_bin,data=bin_outcome, main="Gebrek aan regie * samenloop",
+bp1 <- boxplot(GGRLS202_dich~zw_bin,data=bin_outcome, main="Gebrek aan regie * samenloop",
         xlab="level of samenloop", ylab="gebrek aan regie", staplewex = 1) 
 bp1
 dev.off()
