@@ -6,7 +6,7 @@
 # techniques : Principal component (PCA), aggregating, plotting
 # author : Mark Henry Gremmen, in cooperation with Gemma Smulders
 # DataScienceHub @ JADS, GGD Hart voor Brabant
-# lud 2019-07-12
+# lud 2019-08-22
 #-------------------------------------------------------------------------------
 
 #clear environment
@@ -58,10 +58,6 @@ options(digits=3)
 #number of clusters (Kmeans, Hierarchical Cluster Analysis) 
 #always (re)check the optimal number of clusters!!!
 #see DIMENSION.R section II. 'Optimal number of clusters'
-#determine the optimal number of clusters first before running the entire script
-#run the script to the point (including) section II first
-#the GAP plot will indicate the oprimal number of clusters
-#adjust 'k' accordingly below. 
 k <- 8
 
 #number of factors (PCA)
@@ -88,8 +84,12 @@ colors_cust <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2
 # LOAD DATA (result from procedure 01 'DIMENSION')
 
 load(file = paste0(data.loc,"FINAL_DF",".Rda"))
-z <- FINAL_DF
+z <- FINAL_DF 
 
+
+z$cl_kmeans <- as.numeric(as.character(z$cl_kmeans))
+
+z$cl_kmeans[is.na(z$cl_kmeans)] <- 0
 
 #-------------------------------------------------------------------------------
 # WEIGHT
@@ -141,7 +141,7 @@ write.table(vulnerable_clus , file = paste0(data.loc,"weighted_vulnerable_distri
 
 #-------------------------------------------------------------------------------
 
-qs <- z
+qs <- z 
 cols_report <- c("cl_kmeans", "case_wei", "GGEES203", "GGRLS202", "GGADS201", "LFT0109", "samenloop") 
 qs_s <- qs[,cols_report]
 
@@ -150,21 +150,20 @@ qs_s[] <- lapply(qs_s, function(x) {
 })
 
 #weighted means of outcome * cluster
+
 a <- qs_s %>%
-  na.omit(cl_kmeans) %>%
-  mutate(as.factor(cl_kmeans))  %>%
+  subset(!is.na(cl_kmeans)) %>%
+  mutate(as.factor(cl_kmeans)) %>%
   group_by(cl_kmeans) %>%
   summarise(
-    leeftijd_w = weighted.mean(LFT0109, case_wei),
-    samenloop_w = weighted.mean(samenloop, case_wei),
-    eenzaam_w = weighted.mean(GGEES203, case_wei),
-    regie_w = weighted.mean(GGRLS202, case_wei),
-    depri_w = weighted.mean(GGADS201, case_wei)
+    leeftijd_w = weighted.mean(LFT0109, case_wei,na.rm = TRUE),
+    samenloop_w = weighted.mean(samenloop, case_wei,na.rm = TRUE),
+    eenzaam_w = weighted.mean(GGEES203, case_wei,na.rm = TRUE),
+    regie_w = weighted.mean(GGRLS202, case_wei,na.rm = TRUE),
+    depri_w = weighted.mean(GGADS201, case_wei,na.rm = TRUE)
   )
 
 print(a)
-
-
 
 write.table(a , file = paste0(data.loc,"Weigthed_means_outcome_clusters_kmeans",".csv"))
 
@@ -176,7 +175,7 @@ cols_geo <- c("cl_kmeans", "case_wei", "Gemeentecode")
 qg_s <- qg[,cols_geo]
 
 gem <- qg_s %>%
-  na.omit(cl_kmeans) %>%
+  subset(!is.na(cl_kmeans)) %>%
   mutate(as.factor(cl_kmeans))
 gem
 
@@ -203,9 +202,11 @@ z$leeftijd <- as.numeric(z$LFT0109)
 plot.nme = paste0(ggd,'_cluster_',clustering,'_leeftijd.png')
 plot.store <-paste0(plots.loc,plot.nme)
 png(filename=plot.store,height = png_height , width = png_height * aspect_ratio)
-bp3 <- ggplot(z, aes(x = factor(cl_kmeans), y = leeftijd, weight = case_wei), na.rm=TRUE) + 
+bp3 <- ggplot(z, aes(x = factor(cl_kmeans), y = leeftijd, weight = case_wei,fill=as.factor(cl_kmeans), na.rm=TRUE) + 
   geom_boxplot(width=0.6,  colour = I("#3366FF")) + 
-  geom_point(data=a,aes(x=factor(cl_kmeans),y=leeftijd_w),shape = 23, size = 3, fill ="red",inherit.aes=FALSE)
+  stat_summary(fun.y=mean, geom="point", shape=5, size=4) +
+  geom_point(data=a,aes(x=factor(cl_kmeans),y=leeftijd_w),shape = 23, size = 3, fill ="red",inherit.aes=FALSE) +
+  ggtitle("Add horizontal lines to whiskers using ggplot2")
 bp3
 dev.off()
 
@@ -275,10 +276,10 @@ dev.off()
 
 
 ct <- z %>%
-  na.omit(cl_kmeans)
+   subset(!is.na(cl_kmeans))
 
 #crosstab incidentie eenzaamheid
-ct_eenzaamheid <- crosstab(ct$cl_kmeans, ct$GGEES208, weight = ct$case_wei,chisq = TRUE,cell.layout = TRUE,
+ct_eenzaamheid <- crosstab(ct$cl_kmeans, ct$GGEES208, weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
                dnn = c("cluster", "Eenzaamheid"),
                expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
 ct_eenzaamheid
@@ -286,7 +287,7 @@ ct_eenzaamheid
 
 
 #crosstab incidentie mantelzorg geven
-ct_mz <- crosstab(ct$cl_kmeans, ct$MCMZGA205, weight = ct$case_wei,chisq = TRUE,cell.layout = TRUE,
+ct_mz <- crosstab(ct$cl_kmeans, ct$MCMZGA205, weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
                            dnn = c("cluster", "Mantelzorg verlenen"),
                   expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
 ct_mz
@@ -301,26 +302,20 @@ ct_mz
 
 
 
-
-
 #ervaren gezondheid
 #3 is slecht of zeer slecht
 
-gez <- crosstab(ct$cl_kmeans, ct$KLGGA207, weight = ct$case_wei,chisq = TRUE,cell.layout = TRUE,
+gez <- crosstab(ct$cl_kmeans, ct$KLGGA207, weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
                       dnn = c("cluster", "Ervaren gezondheid"),
                       expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
 gez
 
 
-
-
 #heeft langdurig last van ziekte of aandoening
-chron <- crosstab(ct$cl_kmeans, ct$CALGA260, weight = ct$case_wei,chisq = TRUE,cell.layout = TRUE,
+chron <- crosstab(ct$cl_kmeans, ct$CALGA260, weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
                 dnn = c("cluster", "Langdurige ziekte of aandoening"),
                 expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
 chron
-
-
 
 
 #gest. hh inkomen in kwintielen ct$inkkwin_2016 or KwintielInk
@@ -340,9 +335,6 @@ rk <- crosstab(ct$cl_kmeans, ct$MMIKB201, weight = ct$case_wei,chisq = TRUE,cell
 rk
 
 
-
-
-
 #werkloos en werkzoekend
 wkl <- crosstab(ct$cl_kmeans, ct$MMWSA207, weight = ct$case_wei,chisq = TRUE,cell.layout = TRUE,
                dnn = c("cluster", "Werkloos en werkzoekend"),
@@ -359,15 +351,11 @@ pen
 
 
 
-
 #huisvrouw/-man
 huis <- crosstab(ct$cl_kmeans, ct$MMWSA210, weight = ct$case_wei,chisq = TRUE,cell.layout = TRUE,
                 dnn = c("cluster", "Huisvrouw/-man"),
                 expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
 huis
-
-
-
 
 
 
@@ -468,20 +456,21 @@ for(i in 1:k) {
 #filter by cluster number  
 v <-subset(sit,cl_kmeans==i)
 
-#if PCA returns error for a certain cluster it results from lack of differentation on one or two features.
-#in that case disbale for-loop and feed i with a cluster number manually
-#disable the feature(s) for that particular clsuter by removing bracket below
-#v$dagactiviteit <- NULL
-#v$geenbetaaldwerk <- NULL
-
 dimens_comp<-NULL
 
 dimens_comp<- principal(v[,-which(names(v)=="cl_kmeans")], nfactors = f, residuals = FALSE,rotate=rotation,n.obs=NA, covar=FALSE,
                         scores=TRUE,missing=TRUE,impute="median")
 
-#reset f based on the elbow 						
-plot(dimens_comp$values, type="b")
-						
+#reset f based on the elbow 	
+
+plot.nme = paste0(ggd,'_pca_biplot_situational_cluster_',i,'.png')
+plot.store <-paste0(plots.loc,plot.nme)
+png(filename=plot.store,height = png_height , width = png_height * aspect_ratio)
+
+pca_plot <- plot(dimens_comp$values, type="b")
+pca_plot
+dev.off()
+
 prop.table(dimens_comp$values)
 
 print(loadings(dimens_comp), cutoff=0.4)
@@ -489,7 +478,7 @@ print(loadings(dimens_comp), cutoff=0.4)
 #dimens_comp$loadings
 
 #biplot of the first three rotated PCs
-biplot(dimens_comp, choose=1:3, cutl=.4, smoother=TRUE)
-
+pca_plots <- biplot(dimens_comp, choose=1:3, cutl=.4, smoother=TRUE)
+pca_plots
 
 }

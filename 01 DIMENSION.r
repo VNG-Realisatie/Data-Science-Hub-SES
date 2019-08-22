@@ -19,7 +19,7 @@ cat("\014")
 #packages
 packages <- c("tools","here","tidyverse","naniar", "haven", "stats", "mice","VIM", "corrplot", "car", "nFactors", "psych", "caret", 
               "Rtsne", "cluster","dbscan", "dendextend", "fpc", "factoextra", "rpart", "rpart.plot", "weights",  
-              "ggplot2", "ggthemes", "qgraph", "gridExtra","randomForest","tidyr","dlookr", "aod")
+              "ggplot2", "ggthemes", "qgraph", "gridExtra","randomForest","tidyr","dlookr", "aod", "janitor", "descr")
 #install packages which are not available on the computing setup
 has_available   <- packages %in% rownames(installed.packages())
 if(any(!has_available)) install.packages(packages[!has_available])
