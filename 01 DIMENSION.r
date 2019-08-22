@@ -154,7 +154,7 @@ GEO$GGD <- ggd
 #
 #eenzaamheid_dich : (zeer) ernstig eenzaam (dichotoom)
 #regie_dich : onvoldoende regie over eigen leven (dichotoom)
-#GGADA202 : (mid-)Matig of hoog risico op angststoornis of depressie (dichotoom)
+#GGADS201_dich: (mid-)Matig of hoog risico op angststoornis of depressie (dichotoom)
 #ervarengezondheid_dich ; (zeer) slechte gezondheid (dichotoom)
 #score_zw : hoge samenloop (op onderstaande items) (will be created on-the-fly) 
 
