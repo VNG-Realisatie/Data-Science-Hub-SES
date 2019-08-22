@@ -89,7 +89,7 @@ z <- FINAL_DF
 
 z$cl_kmeans <- as.numeric(as.character(z$cl_kmeans))
 
-z$cl_kmeans[is.na(z$cl_kmeans)] <- 0
+#z$cl_kmeans[is.na(z$cl_kmeans)] <- 0
 
 #-------------------------------------------------------------------------------
 # WEIGHT
@@ -202,11 +202,11 @@ z$leeftijd <- as.numeric(z$LFT0109)
 plot.nme = paste0(ggd,'_cluster_',clustering,'_leeftijd.png')
 plot.store <-paste0(plots.loc,plot.nme)
 png(filename=plot.store,height = png_height , width = png_height * aspect_ratio)
-bp3 <- ggplot(z, aes(x = factor(cl_kmeans), y = leeftijd, weight = case_wei,fill=as.factor(cl_kmeans), na.rm=TRUE) + 
+bp3 <- ggplot(z, aes(x = factor(cl_kmeans), y = leeftijd, weight = case_wei,fill=as.factor(cl_kmeans), na.rm=TRUE)) + 
   geom_boxplot(width=0.6,  colour = I("#3366FF")) + 
   stat_summary(fun.y=mean, geom="point", shape=5, size=4) +
   geom_point(data=a,aes(x=factor(cl_kmeans),y=leeftijd_w),shape = 23, size = 3, fill ="red",inherit.aes=FALSE) +
-  ggtitle("Add horizontal lines to whiskers using ggplot2")
+  ggtitle("Leeftijd")
 bp3
 dev.off()
 
@@ -219,7 +219,8 @@ plot.store <-paste0(plots.loc,plot.nme)
 png(filename=plot.store,height = png_height , width = png_height * aspect_ratio)
 bp4 <- ggplot(z, aes(x = factor(cl_kmeans), y = samenloop, weight = case_wei),na.rm=TRUE) + 
   geom_boxplot(width=0.6,  colour = I("#3366FF")) +
-  geom_point(data=a,aes(x=factor(cl_kmeans),y=samenloop_w),shape = 23, size = 3, fill ="red",inherit.aes=FALSE)
+  geom_point(data=a,aes(x=factor(cl_kmeans),y=samenloop_w),shape = 23, size = 3, fill ="red",inherit.aes=FALSE) +
+  ggtitle("Samenloop")
 bp4
 dev.off()
 
@@ -232,7 +233,8 @@ plot.store <-paste0(plots.loc,plot.nme)
 png(filename=plot.store,height = png_height , width = png_height * aspect_ratio)
 bp5 <- ggplot(z, aes(x = factor(cl_kmeans), y = GGADS201, weight = case_wei, ylab('angst en depressie')),na.rm=TRUE) + 
   geom_boxplot(width=0.6,  colour = I("#3366FF")) +
-  geom_point(data=a,aes(x=factor(cl_kmeans),y=depri_w),shape = 23, size = 3, fill ="red",inherit.aes=FALSE)
+  geom_point(data=a,aes(x=factor(cl_kmeans),y=depri_w),shape = 23, size = 3, fill ="red",inherit.aes=FALSE) +
+  ggtitle("Angst en depressie")
 bp5
 dev.off()
 
@@ -246,7 +248,8 @@ plot.store <-paste0(plots.loc,plot.nme)
 png(filename=plot.store,height = png_height , width = png_height * aspect_ratio)
 bp6 <- ggplot(z, aes(x = factor(cl_kmeans), y = GGRLS202, weight = case_wei, ylab('regie op het leven')),na.rm=TRUE) + 
   geom_boxplot(width=0.6,  colour = I("#3366FF")) +
-  geom_point(data=a,aes(x=factor(cl_kmeans),y=regie_w),shape = 23, size = 3, fill ="red",inherit.aes=FALSE)
+  geom_point(data=a,aes(x=factor(cl_kmeans),y=regie_w),shape = 23, size = 3, fill ="red",inherit.aes=FALSE) +
+  ggtitle("Regie op het leven")
 bp6
 dev.off()
 
@@ -260,10 +263,9 @@ png(filename=plot.store,height = png_height , width = png_height * aspect_ratio)
 
 bp7 <- ggplot(z, aes(x = factor(cl_kmeans), y = GGEES203, weight = case_wei, ylab('eenzaamheid')),na.rm=TRUE) + 
   geom_boxplot(width=0.6,  colour = I("#3366FF")) +
-  geom_point(data=a,aes(x=factor(cl_kmeans),y=eenzaam_w),shape = 23, size = 3, fill ="red",inherit.aes=FALSE)
-
+  geom_point(data=a,aes(x=factor(cl_kmeans),y=eenzaam_w),shape = 23, size = 3, fill ="red",inherit.aes=FALSE) +
+  ggtitle("Eenzaamheid")
 bp7
-
 dev.off()
 
 
