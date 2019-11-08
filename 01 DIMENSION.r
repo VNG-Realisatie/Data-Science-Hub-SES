@@ -8,8 +8,8 @@
 # requirements: R Statistics version  (3.60=<)
 # author : Mark Henry Gremmen, in cooperation with Gemma Smulders, Ester de Jonge
 # DataScienceHub @ JADS, GGD Hart voor Brabant, GGD Zuid-Holland Zuid
-# lud 2019-11-05
-#-------------------------------------------------------------------------------
+# lud 2019-11-08
+#------------------------------------------------------------------------------
 
 #clear environment
 rm(list=ls())
@@ -19,7 +19,7 @@ cat("\014")
 
 #packages
 packages <- c("devtools","tools","here","tidyverse","naniar", "haven", "stats", "mice","VIM", "corrplot", "car", "nFactors", "psych", "caret", 
-              "Rtsne", "cluster","dbscan", "dendextend", "fpc", "factoextra", "rpart", "rpart.plot", "weights", "RColorBrewer","skimr",  
+              "Rtsne", "cluster","dbscan", "dendextend", "fpc", "factoextra", "rpart", "rpart.plot", "weights", "RColorBrewer","skimr", "corrplot",  
               "ggplot2", "ggthemes", "qgraph", "gridExtra","randomForest","tidyr","dlookr", "aod", "janitor", "descr", "forcats", "sqldf")
 #install packages which are not available on the computing setup
 has_available   <- packages %in% rownames(installed.packages())
@@ -43,21 +43,21 @@ ggd <- 'ZHZ' #Zuid-Holland Zuid
 
 #set graphs location
 plots.dir <- paste0(root,'/PLOTS/')
-if (!dir.exists(plots.dir)) {dir.create(plots.dir)}
-
 plots.loc <- paste0(root,'/PLOTS/',ggd,'/')
-if (!dir.exists(plots.loc)) {dir.create(plots.loc)}
 
 #set data location 
 data.dir <- paste0(root,'/DATA/')
-if (!dir.exists(data.dir)) {dir.create(data.dir)}
-
 data.loc <- paste0(root,'/DATA/',ggd,'/')
-if (!dir.exists(data.loc)) {dir.create(data.loc)}
+
+locations <- c(plots.dir, data.dir, plots.loc, data.loc)
+
+lapply(locations, function(x) {
+  if (!dir.exists(x)) {dir.create(x)}
+})
 
 #config
 set.seed(123)  # for reproducibility
-options(digits=3)
+options(digits=10)
 
 #respondent id = "volgnummer"
 
@@ -68,7 +68,7 @@ options(digits=3)
 #run the script to the point (including) section II first
 #the GAP plot will indicate the optimal number of clusters
 #adjust 'k' accordingly below. 
-k <- 10
+k <- 7
 
 #perplexity (Tsne)
 #In Tsne, the perplexity may be viewed as a knob that sets the number of 
@@ -76,7 +76,7 @@ k <- 10
 #value between 30 and 50 is usually fine
 perplex <- 35
 
-#dimension plots
+#dimension and quality plots
 graph_height <- 9
 png_height <- 600
 aspect_ratio <- 2
@@ -146,59 +146,65 @@ save(SOURCE_RAW,file=paste0(data.loc,"SOURCE_RAW",".Rda"))
 
 #GEO data was supplied seperately (due to AVG/GDPR)
 #if included in the main dataframe please comment the following block
-#... and the merge of the GEO dataframe near the end of the procedure
-geo.loc <- paste0(data.loc,"GGD-MONITOR-2016-GEO.sav")
-GEO <- as.data.frame(read_spss(geo.loc))
-GEO$respondent_id<- as.factor(GEO$volgnummer) 
-GEO$respondent_id <- paste0("x",GEO$volgnummer)
-GEO <- remove_rownames(GEO)
-GEO <- column_to_rownames(GEO, var = "respondent_id")
+#geo.loc <- paste0(data.loc,"GGD-MONITOR-2016-GEO.sav")
+#GEO <- as.data.frame(read_spss(geo.loc))
+#GEO$respondent_id<- as.factor(GEO$volgnummer) 
+#GEO$respondent_id <- paste0("x",GEO$volgnummer)
+#GEO <- remove_rownames(GEO)
+#GEO <- column_to_rownames(GEO, var = "respondent_id")
 #GGD region
-GEO$GGD <- ggd
-head(GEO)
+#GEO$GGD <- ggd
+#head(GEO)
 
 #-------------------------------------------------------------------------------
 #DATA PREPARATION
 
 #HIGH-ORDER OUTCOME VARIABLES (as proxy for vulnerability) : inclusion criteria
 #
-#eenzaamheid_dich : (zeer) ernstig eenzaam (dichotoom)
-#regie_dich : onvoldoende regie over eigen leven (dichotoom)
-#GGADS201_dich: (mid-)Matig of hoog risico op angststoornis of depressie (dichotoom)
-#ervarengezondheid_dich ; (zeer) slechte gezondheid (dichotoom)
-#score_zw : hoge samenloop (op onderstaande items, 5<) (will be created on-the-fly) 
+#GGEES203 : (zeer) ernstig eenzaam (dichotoom)
+#GGRLS202 : onvoldoende regie over eigen leven (dichotoom)
+#GGADS201 : (mid-)Matig of hoog risico op angststoornis of depressie (dichotoom)
+#KLGGA207 ; (zeer) slechte gezondheid (dichotoom)
+#score_zw : hoge samenloop (op onderstaande items, 4<) (will be created on-the-fly) 
 
-#FEATURES (20 vars)
 
-#zinvolle dagbesteding - 1 var
-#dagactiviteit : !betaald werk, vrijwilligerswerk, student (dichotoom)
+#FEATURES (25 vars)
 
-#proxy eenzaamheid - 5 vars
-#GGEEB201 : !Kan praten over dagelijkse problemen (nog dischotomiseren)
-#GGEEB203 : Ervaar leegte (nog dischitomiseren)
-#GGEEB204 : !mensen om op terug te vallen bij narigheid (nog dischotomiseren)
-#GGEEB207 : !Veel mensen om op te vertrouwen (nog dischitomiseren)
-#GGEEB208 : !Voldoende mensen waarmee verbondenheid is (nog dischotomiseren)
+#zinvol bestaan / betekenisvol sociaal netwerk - 3 var
+#MMWSA205, MMWSA211 : werk / opleiding 
+#MMVWB201 : vrijwilligerswerk NEW
+#MCMZGS203 : mantelzorger NEW
+
+#eenzaamheid - 7 vars
+#GGEEB201 : !Kan praten over dagelijkse problemen 
+#GGEEB203 : Ervaar leegte 
+#GGEEB204 : !mensen om op terug te vallen bij narigheid 
+#GGEEB207 : !Veel mensen om op te vertrouwen 
+#GGEEB208 : !Voldoende mensen waarmee verbondenheid is 
+
+#GGEEB210 : Voel me vaak in de steekgelaten NEW
+#GGEEB211 : !Kan bij vrienden terecht wanneer behoefte is NEW
 
 #gezondheid en beperkingen - 5 vars 
-#CALGA260 : Heeft langdurige ziekte(n) of aandoening(en) (dichotoom)
-#CALGA261 : Is (ernstig) beperkt in activiteiten vanwege gezondheid (dichotoom)
+#CALGA260 : Heeft langdurige ziekte(n) of aandoening(en) 
+#CALGA261 : Is (ernstig) beperkt in activiteiten vanwege gezondheid 
 #LGBPS209 : Heeft minimaal een beperking met horen, zien of mobiliteit (ofwel minimaal grote moeite met 1 vd 7 OECD items)
-#AGGWS205 : Obesitas, ofwel een BMI van 30 of hoger (dichotoom)
-#MMIKB201 : moeite met rondkomen (nog dichotomiseren)
+#AGGWS205 : Obesitas, ofwel een BMI van 30 of hoger NEW
+#MMIKB201 : moeite met rondkomen 
 
-#angst en depressie (categorical) - 5 vars
-#GGADB201 : Hoe vaak vermoeid zonder duidelijke reden? (nog dischotomiseren)
-#GGADB202 : Hoe vaak zenuwachtig? (nog dischotomiseren)
-#GGADB204 : Hoe vaak hopeloos? (nog dischotomiseren)
-#GGADB207 : Hoe vaak somber of depressief? (nog dischotomiseren)
-#GGADB210 : Hoe vaak afkeurenswaardig, minderwaardig of waardeloos? (nog dischotomiseren)
+#angst en depressie - 5 vars
+#GGADB201 : Vaak vermoeid zonder duidelijke reden 
+#GGADB202 : Vaak zenuwachtig 
+#GGADB204 : Vaak hopeloos 
+#GGADB207 : Vaak somber of depressief
+#GGADB210 : Vaak afkeurenswaardig, minderwaardig of waardeloos
 
-#proxy regie op het leven - 4 vars
+#regie op het leven - 5 vars
 #GGRLB201 : Weinig controle over dingen die mij overkomen
 #GGRLB202 : Sommige van mijn problemen kan ik met geen mogelijkheid oplossen
 #GGRLB204 : Ik voel me vaak hulpeloos bij omgaan problemen van het leven
 #GGRLB206 : Wat er in de toekomst met me gebeurt hangt voor grootste deel van mezelf af
+#MCMZOS304 : mantelzorg ontvangen NEW
 
 #create new recoded variables
 #ervarengezondheid_dich 1 '(zeer) slecht' 0 'matig tot (zeer) goed)'
@@ -215,10 +221,35 @@ SOURCE_RAW$angstdepressie_dich[SOURCE_RAW$GGADS201==9] <- NA
 #eenzaamheid_dich 1 '(zeer) ernstig eenzaam' 0 'niet of matig eenzaam'
 SOURCE_RAW$eenzaamheid_dich = recode(SOURCE_RAW$GGEES209, "1=1; 0=0; 8=0; 9=NA")
 
-#dagactiviteit 'betaald werk, vrijwilligerswerk, student' (zinvolle dagbesteding)
-SOURCE_RAW$dagactiviteit <- 0
-SOURCE_RAW$dagactiviteit[SOURCE_RAW$MMWSA205==9 & SOURCE_RAW$MMVWB201==9 & SOURCE_RAW$MMWSA211==9] <- NA
-SOURCE_RAW$dagactiviteit[SOURCE_RAW$MMWSA205==1 | SOURCE_RAW$MMVWB201==1 | SOURCE_RAW$MMWSA211==1] <- 1
+#werkopleiding 'betaald werk, student' 
+SOURCE_RAW$werkopleiding <- 0
+SOURCE_RAW$werkopleiding[SOURCE_RAW$MMWSA205==1 | SOURCE_RAW$MMWSA211==1] <- 1
+SOURCE_RAW$werkopleiding[SOURCE_RAW$MMWSA205==9 & SOURCE_RAW$MMWSA211==9] <- NA
+
+#vrijwilligerswerk NEW
+SOURCE_RAW$vrijwilligerswerk <-0
+SOURCE_RAW$vrijwilligerswerk[SOURCE_RAW$MMVWB201==1] <-1
+SOURCE_RAW$vrijwilligerswerk[SOURCE_RAW$MMVWB201==9] <-NA
+
+#mantelzorger NEW
+SOURCE_RAW$mantelzorg[SOURCE_RAW$MCMZGS203==0] <-0
+SOURCE_RAW$mantelzorg[SOURCE_RAW$MCMZGS203==1] <-1
+SOURCE_RAW$mantelzorg[SOURCE_RAW$MCMZGS203==9] <-NA
+
+#vriendenkring NEW
+SOURCE_RAW$vriendenkring <-0
+SOURCE_RAW$vriendenkring[SOURCE_RAW$GGEEB206==2 | SOURCE_RAW$GGEEB206==3] <-1
+SOURCE_RAW$vriendenkring[SOURCE_RAW$GGEEB206==9] <-NA
+
+#goedevriend NEW
+SOURCE_RAW$goedevriend <-0
+SOURCE_RAW$goedevriend[SOURCE_RAW$GGEEB202==2 | SOURCE_RAW$GGEEB202==3] <-1
+SOURCE_RAW$goedevriend[SOURCE_RAW$GGEEB202==9] <-NA
+
+#mensen om me heen NEW
+SOURCE_RAW$mensenomheen <-0
+SOURCE_RAW$mensenomheen[SOURCE_RAW$GGEEB209==2 | SOURCE_RAW$GGEEB209==3] <-1
+SOURCE_RAW$mensenomheen[SOURCE_RAW$GGEEB209==9] <-NA
 
 #inkkwin_2016 'Gestandaardiseerd huishoudinkomen in kwintielen (numerieke variabele)'
 #inkkwin_2016 1 '0 tot 20% (max 16.100 euro)' 2 '20 tot 40% (max 21.300 euro)' 3 '40 tot 60% (max 27.200 euro)'
@@ -248,9 +279,21 @@ SOURCE_RAW$ziek_lt = recode(SOURCE_RAW$CALGB260, "1=1; 2=0; 9=NA")
 #depri_hg matig of hoog risico op angst en depressie
 SOURCE_RAW$depri_hg = recode(SOURCE_RAW$GGADA202, "0=0; 1=1; 9=NA")
 
+
 #NORMALIZE DATA
 #Recoding -where needed- into new dichotomous variable with the same direction of the loadings (0=NO ISSUE)
-SOURCE_RAW$dagactiviteit_dich = recode(SOURCE_RAW$dagactiviteit, "1=0; 0=1;")
+SOURCE_RAW$werkopleiding_dich = recode(SOURCE_RAW$werkopleiding, "1=0; 0=1;")
+
+SOURCE_RAW$vrijwilligerswerk_dich = recode(SOURCE_RAW$vrijwilligerswerk, "1=0; 0=1;")
+
+#okay, mz is not a social activity (but is a meaningful social relation)
+SOURCE_RAW$mantelzorg_dich = recode(SOURCE_RAW$mantelzorg, "1=0; 0=1;")
+
+SOURCE_RAW$vriendenkring_dich = recode(SOURCE_RAW$vriendenkring, "1=0; 0=1;")
+
+SOURCE_RAW$goedevriend_dich = recode(SOURCE_RAW$goedevriend, "1=0; 0=1;")
+
+SOURCE_RAW$mensenomheen_dich = recode(SOURCE_RAW$mensenomheen, "1=0; 0=1;")
 
 SOURCE_RAW$MMIKB201_dich = recode(SOURCE_RAW$MMIKB201, "4=1; 3=0; 2=0; 1=0")
 
@@ -263,6 +306,10 @@ SOURCE_RAW$GGEEB204_dich = recode(SOURCE_RAW$GGEEB204, "3=1; 2=0; 1=0")
 SOURCE_RAW$GGEEB207_dich = recode(SOURCE_RAW$GGEEB207, "3=1; 2=0; 1=0")
 
 SOURCE_RAW$GGEEB208_dich = recode(SOURCE_RAW$GGEEB208, "3=1; 2=0; 1=0")
+
+SOURCE_RAW$GGEEB210_dich = recode(SOURCE_RAW$GGEEB210, "1=1; 2=0; 3=0")
+
+SOURCE_RAW$GGEEB211_dich = recode(SOURCE_RAW$GGEEB211, "3=1; 2=0; 1=0")
 
 SOURCE_RAW$GGRLB201_dich = recode(SOURCE_RAW$GGRLB201, "1=1; 2=0; 3=0; 4=0; 5=0")
 
@@ -281,6 +328,8 @@ SOURCE_RAW$GGADB204_dich = recode(SOURCE_RAW$GGADB204, "1=1; 2=1; 3=0; 4=0; 5=0"
 SOURCE_RAW$GGADB207_dich = recode(SOURCE_RAW$GGADB207, "1=1; 2=1; 3=0; 4=0; 5=0")
 
 SOURCE_RAW$GGADB210_dich = recode(SOURCE_RAW$GGADB210, "1=1; 2=1; 3=0; 4=0; 5=0")
+
+SOURCE_RAW$MCMZOS304_dich = recode(SOURCE_RAW$MCMZOS304, "0=0; 1=1; 9=NA")
 
 SOURCE_ENRICHED <- SOURCE_RAW
 
@@ -302,9 +351,10 @@ save(SOURCE_ENRICHED,file=paste0(data.loc,"SOURCE_ENRICHED",".Rda"))
 #if you add features, please do so add the end of the list
 #only add dichotomized features (which indicicate experienced issues/vulnerability, vitality or resilience)
 cols <- c("GGEES203","GGRLS202","GGADS201","KLGGA207", # <- outcome level
+          "werkopleiding_dich", "vrijwilligerswerk_dich", "mantelzorg_dich", # <- zinvol bestaan
           "MMIKB201_dich","CALGA260","CALGA261","LGBPS209","AGGWS205","GGEEB201_dich","GGEEB203_dich","GGEEB204_dich","GGEEB207_dich",
           "GGEEB208_dich","GGRLB201_dich","GGRLB202_dich","GGRLB204_dich","GGRLB206_dich","GGADB201_dich","GGADB202_dich","GGADB204_dich",
-          "GGADB207_dich","GGADB210_dich","dagactiviteit_dich") 
+          "GGADB207_dich","GGADB210_dich","GGEEB210_dich","GGEEB211_dich", "MCMZOS304_dich") 
 SOURCE_SUBSET <- subset(SOURCE_ENRICHED, select = cols)
 
 #append '_dich' to variable name of the remaining variables not containing '_dich'
@@ -312,7 +362,7 @@ colnames(SOURCE_SUBSET) <- sub("^(?!.*_dich)(.*)", "\\1_dich", colnames(SOURCE_S
 
 #proxy for level of issues: 'hoge samenloop / multi-problematiek' start column range after outcome level indicators
 score_zw <- SOURCE_SUBSET %>%
-  mutate (score_zw = rowSums(SOURCE_SUBSET[,5:ncol(SOURCE_SUBSET)],na.rm=TRUE))
+  mutate (score_zw = rowSums(SOURCE_SUBSET[,8:ncol(SOURCE_SUBSET)],na.rm=TRUE))
 
 score_zw <- score_zw[,c("score_zw")]
 SOURCE_SUBSET <- cbind(SOURCE_SUBSET,score_zw)
@@ -347,14 +397,14 @@ dev.off()
 #inclusion criteria
 #kwetsbare of (dreigende) zorgwekkende gevallen op het vlak van 
 #eenzaamheid en / of gebrek regie op het leven, en / of angststoornis/depressie en / of
-#ervaren gezondheid is slechts en / of hoge samenloop van problematiek
+#ervaren gezondheid en / of hoge samenloop van problematiek
 #adjust threshold gebrek aan regie en samenloop based on binning and boxplot results (see above)
 
 SOURCE_SUBSET <- SOURCE_SUBSET[ which(SOURCE_SUBSET$GGEES203_dich>8 #eenzaamheid
                                       | SOURCE_SUBSET$GGRLS202_dich<20 #regie op het leven 
                                       | SOURCE_SUBSET$GGADS201_dich>22 #angststoornis of depressie
                                       | SOURCE_SUBSET$KLGGA207_dich==3 #ervaren gezondheid 
-                                      | SOURCE_SUBSET$score_zw>5) #samenloop
+                                      | SOURCE_SUBSET$score_zw>4) #samenloop
                                       , ]
 
 #remove outcome variables, keep relevant variables for the fingerprint
@@ -429,7 +479,7 @@ summary(imp_data)
 #it is important that convergence is taking effect towards the end of the iteration process
 plot(imp_data)
 
-#do additional iterations lead to more convergence than maxit 10?
+#do additional iterations lead to better convergence than maxit 10?
 imp_ext <- mice.mids(imp_data, maxit=20, print=F)
 
 plot.nme = paste0(ggd,'_convergence_imputation_iterations.png')
@@ -479,8 +529,8 @@ plot.nme = paste0(ggd,'_correlation_features.png')
 plot.store <-paste0(plots.loc,plot.nme)
 png(filename=plot.store,height = png_height,width = png_height * aspect_ratio)
 mdf <- data.matrix(SOURCE_SUBSET) # convert to numeric matrix for correlation calculation 
-corplot <- corrplot(cor(mdf), method="color")
-corplot
+corplot <- corrplot(cor(mdf), method="color",type="upper")
+(corplot)
 dev.off()
 
 
@@ -513,8 +563,8 @@ outlier_dis
 ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio,dpi = dpi)
 
 # Binary outlier variable
-# threshold determined by lower boundery of last valid bin, see outlier distribution plot 
-threshold_zw <- 41.7 # Threshold ZHZ : 36.3 , HvB : 35.1
+# threshold determined by lower boundary of last valid bin, see outlier distribution plot 
+threshold_zw <- 48.2 # Threshold ZHZ : 48.2 , HvB : 35.1 (higher value means more outliers in scope)
 SOURCE_SUBSET$outlier <- "No"
 SOURCE_SUBSET$outlier[SOURCE_SUBSET$MD > threshold_zw] <- "Yes"  
 
@@ -642,7 +692,7 @@ rm(tsne_core)
 #Hopkins statistic: If the value of Hopkins statistic is close to zero (far below 0.5), then dataset is significantly clusterable. 
 
 #gradient_col = list(low = "steelblue", high = "white")
-#get_clust_tendency(d_tsne, n = 50, gradient = gradient_col)
+#get_clust_tendency(tsne, n = 50, gradient = gradient_col)
 
 #res <- get_clust_tendency(ANALYSIS_SUBSET, n = nrow(ANALYSIS_SUBSET)-1, graph = FALSE)
 #res$hopkins_stat
@@ -694,14 +744,12 @@ fit_cluster_kmeans=kmeans(scale(tsne_km), k,iter.max = 1000,algorithm = c("Forgy
 #cluster membership distribution
 fit_cluster_kmeans$size	
 
-#cluster membership
-#fit_cluster_kmeans$cluster <- factor(fit_cluster_kmeans$cluster)
-
-#add clustermemberschip to Tsne dataframe
+#add clustermemberschip to Tsne (focal) dataframe
 tsne_km$cl_kmeans <- as.factor(fit_cluster_kmeans$cluster)
 
+#tsne_sub$repondent_id <- row.names(tsne_sub) 
 #merge focal group with research group
-tsne_km_ext <- merge(tsne_km, tsne_sub, left_index=True, right_index=True,all=TRUE)
+tsne_km_ext <- merge(tsne_sub, tsne_km, left_index=True, right_index=True,all=TRUE)
 
 #extended version
 #tsne_km_ext <- fr[,3:5]
@@ -710,6 +758,7 @@ tsne_km_ext <- merge(tsne_km, tsne_sub, left_index=True, right_index=True,all=TR
 tsne_km_ext$cl_kmeans <- fct_explicit_na(tsne_km_ext$cl_kmeans, "0")
 head(tsne_km_ext,2)
 
+#just in case
 tsne_km_ext$V1 <- as.numeric(as.character(tsne_km_ext$V1))
 tsne_km_ext$V2 <- as.numeric(as.character(tsne_km_ext$V2))
 
@@ -728,9 +777,11 @@ plot.nme = paste0('tsne_kmeans_',dest.nme.var,'_k',k,'_p',perplex,'.png')
 plot.store <-paste0(plots.loc,plot.nme)
 ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio,dpi = dpi)
 
-#add clustermemberschip to Tsne dataframe
-tsne_store$cl_kmeans <- tsne_km_ext$cl_kmeans 
+km_cl <- left_join(tsne_store, tsne_km, left_index=True, right_index=True,all=TRUE)
 
+#add clustermemberschip to Tsne dataframe
+tsne_store$cl_kmeans <- km_cl$cl_kmeans 
+rm(km_cl)
 
 #-------------------------------------------------------------------------------
 # II.2 TSNE (DR) > K-medoids clustering  / partition around mediods PAM (CL)
@@ -836,10 +887,7 @@ head(tsne_store,2)
 
 #mark outliers
 tsne_store$outlier <- 0 
-tsne_store$outlier[tsne_store$cl_kmeans==0] <-1
-
-#reset cluster 0 (outliers) in cl_kmeans to NA
-tsne_store$cl_kmeans[tsne_store$cl_kmeans==0] <- NA
+tsne_store$outlier[is.na(tsne_store$cl_kmeans)] <-1
 
 #reattach index to dataframe
 tsne_store$respondent_id <- as.factor(row.names(tsne_store)) 

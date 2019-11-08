@@ -7,7 +7,7 @@
 # requirements: R Statistics version  (3.60=<)
 # author : Mark Henry Gremmen, in cooperation with Gemma Smulders, Ester de Jonge
 # DataScienceHub @ JADS, GGD Hart voor Brabant, GGD Zuid-Holland Zuid
-# lud 2019-11-05
+# lud 2019-11-06
 #-------------------------------------------------------------------------------
 
 #clear environment
@@ -52,7 +52,7 @@ options(digits=3)
 #number of clusters (Kmeans, Hierarchical Cluster Analysis) 
 #always (re)check the optimal number of clusters!!!
 #see DIMENSION.R section II. 'Optimal number of clusters'
-k <- 10
+k <- 7
 
 #number of factors (PCA)
 f <- 4
@@ -61,8 +61,7 @@ f <- 4
 #distinct dimensions
 rotation <- "varimax"
 
-#clustering method results (as input)
-clustering <- "kmeans"
+
 
 #dimension plots
 graph_height <- 9
@@ -81,8 +80,9 @@ colors_cust <- brewer.pal(ncolors, "Paired")
 load(file = paste0(data.loc,"FINAL_DF",".Rda"))
 z <- FINAL_DF 
 
-#z$cl_kmeans <- as.numeric(as.character(z$cl_kmeans))
-
+#clustering method results (as input)
+clustering <- "kmeans"
+#clus <- z$cl_kmeans
 
 #-------------------------------------------------------------------------------
 # WEIGHT
@@ -96,7 +96,7 @@ z$case_wei <- as.numeric(as.character(z$case_wei))
 
 weight_on <- max(z$case_wei)>1
 
-#create vector of weights for total population
+#create vector of weights for entire population
 wei_vec <- as.vector(z$case_wei) 
 
 
@@ -106,7 +106,7 @@ wei_vec <- as.vector(z$case_wei)
 vulnerable <- wpct(z$vulnerable, weight=wei_vec, na.rm=FALSE)*100
 print(vulnerable)
 
-write.table(vulnerable, file = paste0(data.loc,"weigthed_vulnerable_distribution_population",".csv"))
+write.table(vulnerable, file = paste0(data.loc,"weigthed_vulnerable_distribution",".csv"))
 
 
 #Cluster membership distribution (weigthed) (pct)
@@ -404,14 +404,14 @@ huis
 #leeftijd70eo leeftijd 70 en ouder 
 #ervarengezondheid_dich gezondheid slecht 
 #inkomenlaag_dich inkomen laag
-#dagactiviteit betaald werk, vrijwilligerswerk, student 
+#werkopleiding betaald werk, student 
 #geenbetaaldwerk geen betaald werk
 #opl_lm opleiding volwassenen laag midden
 #ziek_lt langdurige ziekten
 #MCMZOS304 mantelzorg ontvangen laatste 12 maanden
 #MCMZGA205 mantelzorg gegeven laatste 12 maanden
 
-dim_var <- c("cl_kmeans","leeftijd70eo","ervarengezondheid_dich","inkomenlaag_dich", "dagactiviteit",
+dim_var <- c("cl_kmeans","leeftijd70eo","ervarengezondheid_dich","inkomenlaag_dich", "werkopleiding",
              "opl_lm", "ziek_lt", "MCMZOS304", "MCMZGA205") 
 
 #relevant variables for PCA
