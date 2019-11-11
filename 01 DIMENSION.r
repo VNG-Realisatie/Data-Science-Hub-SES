@@ -68,7 +68,7 @@ options(digits=10)
 #run the script to the point (including) section II first
 #the GAP plot will indicate the optimal number of clusters
 #adjust 'k' accordingly below. 
-k <- 7
+k <- 8
 
 #perplexity (Tsne)
 #In Tsne, the perplexity may be viewed as a knob that sets the number of 
@@ -372,27 +372,58 @@ SOURCE_SUBSET <- cbind(SOURCE_SUBSET,score_zw)
 #based on population
 bin_outcome <- SOURCE_SUBSET %>%
   mutate(zw_bin = binning(SOURCE_SUBSET$score_zw),
-         dep_bin = binning(SOURCE_SUBSET$GGADS201_dich)
+         dep_bin = binning(SOURCE_SUBSET$GGADS201_dich),
+         reg_bin = binning(SOURCE_SUBSET$GGRLS202_dich)
          )
 
+
 #regie en samenloop
+plot.title = paste0('Gebrek aan regie * samenloop')
+bp1 <- ggplot(bin_outcome, aes(y = GGRLS202_dich, x = zw_bin, fill=zw_bin)) + 
+  geom_boxplot(width=0.6,  colour = I("#3366FF")) +
+ # geom_point(data=a,aes(x=cl_kmeans,y=samenloop_w),shape = 23, size = 3, fill ="red",inherit.aes=FALSE) +
+  theme_minimal() +
+  xlab("level of samenloop") +
+  ylab("gebrek aan regie") +
+  guides(fill=guide_legend(title="Samenloop")) +
+  ggtitle(plot.title)
+bp1
 plot.nme = paste0(ggd,'_explore_regie_samenloop.png')
 plot.store <-paste0(plots.loc,plot.nme)
-png(filename=plot.store,height = png_height,width = png_height * aspect_ratio)
+ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, dpi=dpi)
 
-bp1 <- boxplot(GGRLS202_dich~zw_bin,data=bin_outcome, main="Gebrek aan regie * samenloop",
-        xlab="level of samenloop", ylab="gebrek aan regie", staplewex = 1) 
-bp1
-dev.off()
+
+#samenloop en gebrek aan regie
+plot.title = paste0('Samenloop * gebrek aan regie')
+bp2 <- ggplot(bin_outcome, aes(x = reg_bin, y = score_zw, fill=reg_bin)) + 
+  geom_boxplot(width=0.6,  colour = I("#3366FF")) +
+  # geom_point(data=a,aes(x=cl_kmeans,y=samenloop_w),shape = 23, size = 3, fill ="red",inherit.aes=FALSE) +
+  theme_minimal() + 
+  ylab("level of samenloop") +
+  xlab("level of gebrek aan regie") +
+  guides(fill=guide_legend(title="Level of regie")) +
+  ggtitle(plot.title)
+bp2
+plot.nme = paste0(ggd,'_explore_samenloop_gebrekregie.png')
+plot.store <-paste0(plots.loc,plot.nme)
+ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, dpi=dpi)
 
 #samenloop en angst & depressie
-plot.nme = paste0(ggd,'_explore_samenloop_angstdepressie.png')
+plot.title = paste0('Samenloop * angst en depressie')
+bp3 <- ggplot(bin_outcome, aes(x = dep_bin, y = score_zw, fill=dep_bin)) + 
+  geom_boxplot(width=0.6,  colour = I("#3366FF")) +
+  # geom_point(data=a,aes(x=cl_kmeans,y=samenloop_w),shape = 23, size = 3, fill ="red",inherit.aes=FALSE) +
+  theme_minimal() + 
+  ylab("level of samenloop") +
+  xlab("level of angst en depressie") +
+  guides(fill=guide_legend(title="Level of A&D")) +
+  ggtitle(plot.title)
+bp3
+plot.nme = paste0(ggd,'_explore_samenloop_angstendepressie.png')
 plot.store <-paste0(plots.loc,plot.nme)
-png(filename=plot.store,height = png_height,width = png_height * aspect_ratio)
-bp2 <- boxplot(score_zw~dep_bin,data=bin_outcome, main="Samenloop * angst en depressie",
-              xlab="level of angst en depressie", ylab="samenloop", staplewex = 1) 
-bp2
-dev.off()
+ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, dpi=dpi)
+
+
 
 #inclusion criteria
 #kwetsbare of (dreigende) zorgwekkende gevallen op het vlak van 
@@ -401,8 +432,8 @@ dev.off()
 #adjust threshold gebrek aan regie en samenloop based on binning and boxplot results (see above)
 
 SOURCE_SUBSET <- SOURCE_SUBSET[ which(SOURCE_SUBSET$GGEES203_dich>8 #eenzaamheid
-                                      | SOURCE_SUBSET$GGRLS202_dich<20 #regie op het leven 
-                                      | SOURCE_SUBSET$GGADS201_dich>22 #angststoornis of depressie
+                                      | SOURCE_SUBSET$GGRLS202_dich<23 #regie op het leven 
+                                      | SOURCE_SUBSET$GGADS201_dich>20 #angststoornis of depressie
                                       | SOURCE_SUBSET$KLGGA207_dich==3 #ervaren gezondheid 
                                       | SOURCE_SUBSET$score_zw>4) #samenloop
                                       , ]
@@ -552,19 +583,22 @@ md$md_bin
 
 #Plot outlier distribution by bin 
 plot.title = paste0('Outlier distribution * bin')
-plot.nme = paste0(ggd,'_outliers_distribution.png')
-plot.store <-paste0(plots.loc,plot.nme)
-
 outlier_dis <- ggplot(md, aes(x = md_bin)) +
   ggtitle(plot.title) +
+  guides(fill=guide_legend(title="Level of outlier")) +
   labs(x = "outlier bin") +
-  geom_bar()
+  theme_minimal() + 
+  geom_bar(aes(fill = md_bin)) 
+
 outlier_dis
+plot.nme = paste0(ggd,'_outliers_distribution.png')
+plot.store <-paste0(plots.loc,plot.nme)
 ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio,dpi = dpi)
+
 
 # Binary outlier variable
 # threshold determined by lower boundary of last valid bin, see outlier distribution plot 
-threshold_zw <- 48.2 # Threshold ZHZ : 48.2 , HvB : 35.1 (higher value means more outliers in scope)
+threshold_zw <- 54.8 # Threshold ZHZ : 48.2 , HvB : 35.1 (higher value means more outliers in scope)
 SOURCE_SUBSET$outlier <- "No"
 SOURCE_SUBSET$outlier[SOURCE_SUBSET$MD > threshold_zw] <- "Yes"  
 
@@ -578,8 +612,11 @@ plot.store <-paste0(plots.loc,plot.nme)
 outlier_dich <- ggplot(md, aes(x = SOURCE_SUBSET$outlier_fac)) +
   ggtitle(plot.title) +
   labs(x = "outliers") +
-  geom_bar() +
+  guides(fill=guide_legend(title="Level of outlier")) +
+  theme_minimal() + 
+  geom_bar(aes(fill = md_bin)) +
   geom_text(aes(label=..count..),stat="count")
+
 outlier_dich
 ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio,dpi = dpi)
 
@@ -656,7 +693,7 @@ ggplot(tsne, aes(x=V1, y=V2)) +
         axis.text.y=element_blank()) +
   theme_void() +
   scale_colour_brewer(palette = "Set2")
-plot.nme = paste0('tsne_raw_',dest.nme.var,'_k',k,'_p',perplex,'.png')
+plot.nme = paste0('tsne_raw_',dest.nme.var,'_p',perplex,'.png')
 plot.store <-paste0(plots.loc,plot.nme)
 ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio,dpi = dpi)
 
@@ -702,7 +739,7 @@ rm(tsne_core)
 
 #very important to determine the optimal number of clusters!
 #three methods: elbow, silhouette and GAP. We choose GAP here.
-plot.nme = paste0(ggd, 'optimal_clusters_n_',dest.nme.var,'_k',k,'_p',perplex,'.png')
+plot.nme = paste0(ggd, 'optimal_clusters_n_',dest.nme.var,'_p',perplex,'.png')
 plot.store <-paste0(plots.loc,plot.nme)
 
 # 3 methods
