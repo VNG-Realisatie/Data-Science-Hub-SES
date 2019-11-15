@@ -7,7 +7,7 @@
 # requirements: R Statistics version  (3.60=<)
 # author : Mark Henry Gremmen, in cooperation with Gemma Smulders, Ester de Jonge
 # DataScienceHub @ JADS, GGD Hart voor Brabant, GGD Zuid-Holland Zuid
-# lud 2019-11-06
+# lud 2019-11-15
 #-------------------------------------------------------------------------------
 
 #clear environment
@@ -19,7 +19,7 @@ cat("\014")
 #packages
 packages <- c("tools","here","tidyverse","naniar", "haven", "mice","VIM", "corrplot", "car", "nFactors", "psych", "caret", 
               "Rtsne", "cluster","dbscan", "dendextend", "fpc", "factoextra", "rpart", "rpart.plot","weights", "RColorBrewer",
-              "ggplot2", "ggthemes", "qgraph", "gridExtra","randomForest","tidyr","dlookr", "aod", "janitor", "descr")
+              "ggplot2", "ggthemes", "qgraph", "gridExtra","randomForest","tidyr","dlookr", "aod", "janitor", "descr", "rlang")
 #install packages which are not available
 has_available   <- packages %in% rownames(installed.packages())
 if(any(!has_available)) install.packages(packages[!has_available])
@@ -47,12 +47,12 @@ data.loc <- paste0(root,'/DATA/',ggd,'/')
 
 #options
 set.seed(123)  # for reproducibility
-options(digits=3)
+options(digits=10)
 
 #number of clusters (Kmeans, Hierarchical Cluster Analysis) 
 #always (re)check the optimal number of clusters!!!
 #see DIMENSION.R section II. 'Optimal number of clusters'
-k <- 7
+k <- 8
 
 #number of factors (PCA)
 f <- 4
@@ -60,8 +60,6 @@ f <- 4
 #rotation (PCA)
 #distinct dimensions
 rotation <- "varimax"
-
-
 
 #dimension plots
 graph_height <- 9
@@ -75,7 +73,7 @@ colors_cust <- brewer.pal(ncolors, "Paired")
 
 
 #-------------------------------------------------------------------------------
-# LOAD DATA (result from procedure 01 'DIMENSION')
+# LOAD DATA (result from previous procedure '01 DIMENSION.R')
 
 load(file = paste0(data.loc,"FINAL_DF",".Rda"))
 z <- FINAL_DF 
@@ -112,15 +110,19 @@ write.table(vulnerable, file = paste0(data.loc,"weigthed_vulnerable_distribution
 #Cluster membership distribution (weigthed) (pct)
 vulnerable_clus <- wpct(z$cl_kmeans, weight=wei_vec, na.rm=FALSE)*100
 vulnerable_clus <- as.data.frame(vulnerable_clus)
+vulnerable_clus$vulnerable_clus <- round(vulnerable_clus$vulnerable_clus, digits=1) 
 vulnerable_clus$cl_kmeans <- as.numeric(row.names(vulnerable_clus))
 
 plot.title = paste0('cluster ',clustering,' membership distribution (weighted=',weight_on ,')')
-cluster_dis <-  ggplot(vulnerable_clus, aes(x =factor(cl_kmeans),y=vulnerable_clus)) +
+cluster_dis <-  ggplot(vulnerable_clus, aes(x =factor(cl_kmeans),y=vulnerable_clus,fill=factor(cl_kmeans))) +
   ggtitle(plot.title) +
+  theme_minimal() + 
+  geom_text(aes(label=vulnerable_clus,color="#ababab"),vjust=-0.1) +
+  theme(legend.position = "none") +
   labs(x = "cluster", y="%") +
-    geom_bar(stat="identity", width = 0.7)
+  geom_bar(stat="identity", width = 0.7)
 cluster_dis
-plot.nme = paste0(ggd,'_cluster_',clustering,'_membership_distribution_weighted_',weight_on ,'.png')
+plot.nme = paste0(ggd,'_cluster_',clustering,'_distribution_weighted_',weight_on ,'.png')
 plot.store <-paste0(plots.loc,plot.nme)
 ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, dpi=dpi)
 
@@ -175,7 +177,25 @@ gem
 ct_gemeente <- crosstab(gem$Gemeentecode, gem$cl_kmeans, weight = gem$case_wei,chisq = TRUE,cell.layout = TRUE,
                            dnn = c("gemeente","cluster"),
                            expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE )
-ct_gemeente
+
+prop<- as.data.frame(ct_gemeente$prop.row*100)
+
+#library(xlsx)
+#write.xlsx(prop, "mydata.xlsx") 
+
+plot.title = paste0('cluster ',clustering,' distribution * gemeente (weighted=',weight_on ,')')
+cluster_gem_dis <-  ggplot(prop, aes(x =factor(gemeente),y=Freq,fill=factor(cluster), label=round(Freq,0))) +
+  ggtitle(plot.title) +
+  theme_minimal() + 
+  theme(legend.position = "right") +
+  labs(x = "gemeente", y="%") +
+  scale_fill_discrete(name = "cluster") +
+  geom_bar(position="stack",stat="identity", width = 0.7) +
+  geom_text(size = 3, position = position_stack(vjust = 0.5))
+cluster_gem_dis
+plot.nme = paste0(ggd,'_cluster_',clustering,'_gemeente_distribution_weighted_',weight_on ,'.png')
+plot.store <-paste0(plots.loc,plot.nme)
+ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, dpi=dpi)
 
 
 #-------------------------------------------------------------------------------
@@ -230,7 +250,7 @@ z$GGADS201 <- as.numeric(z$GGADS201)
 plot.title = paste0('cluster ',clustering,' * angst en depressie (weighted=',weight_on ,')')
 bp5 <- ggplot(z, aes(x = cl_kmeans, y = GGADS201, weight = case_wei, fill=cl_kmeans)) + 
   geom_boxplot(width=0.6,  colour = I("#3366FF")) +
-  geom_point(data=a,aes(x=factor(cl_kmeans),y=depri_w),shape = 23, size = 3, fill ="red",inherit.aes=FALSE) +
+  geom_point(data=a,aes(x=cl_kmeans,y=depri_w),shape = 23, size = 3, fill ="red",inherit.aes=FALSE) +
   theme_minimal() + 
   xlab("cluster") +
   ylab("Risico op angststoornis of depressie") +
@@ -278,54 +298,315 @@ ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, 
 
 
 #-------------------------------------------------------------------------------
-# Crosstabs
+# Crosstabs (WEIGHTED)
 
 
 #-------------------------------------------------------------------------------
 
 
 
-ct <- z %>%
-   subset(!is.na(cl_kmeans))
+ct <- z 
+ # %>% subset(!is.na(cl_kmeans))
 
 #crosstab incidentie eenzaamheid
-ct_eenzaamheid <- crosstab(ct$cl_kmeans, ct$GGEES208, weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
-               dnn = c("cluster", "Eenzaamheid"),
+ct_prop <- crosstab(ct$cl_kmeans, ct$GGEES208, weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
+               dnn = c("cluster", "lvl"),
                expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
-ct_eenzaamheid
+
+prop<- as.data.frame(ct_prop$prop.row*100)
+prop
+
+plot.title = paste0('cluster ',clustering,' * eenzaamheid (weighted=',weight_on ,')')
+cluster_dis <-  ggplot(prop, aes(x =factor(cluster),y=Freq,fill=factor(lvl), label=round(Freq,0))) +
+  ggtitle(plot.title) +
+  theme_minimal() + 
+  theme(legend.position = "right") +
+  labs(x = "cluster", y="%") +
+  scale_fill_discrete(name = " ") +
+  geom_bar(position="stack",stat="identity", width = 0.7) +
+  geom_text(size = 3, position = position_stack(vjust = 0.5))
+cluster_dis
+plot.nme = paste0(ggd,'_cluster_',clustering,'_eenzaamheid_weighted_',weight_on ,'.png')
+plot.store <-paste0(plots.loc,plot.nme)
+ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, dpi=dpi)
+
+
+#crosstab incidentie angst depressie
+ct_prop <- crosstab(ct$cl_kmeans, ct$GGADA202, weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
+                    dnn = c("cluster", "lvl"),
+                    expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
+
+prop<- as.data.frame(ct_prop$prop.row*100)
+prop
+
+plot.title = paste0('cluster ',clustering,' * angst en depressie (weighted=',weight_on ,')')
+cluster_dis <-  ggplot(prop, aes(x =factor(cluster),y=Freq,fill=factor(lvl), label=round(Freq,0))) +
+  ggtitle(plot.title) +
+  theme_minimal() + 
+  theme(legend.position = "right") +
+  labs(x = "cluster", y="%") +
+  scale_fill_discrete(name = " ") +
+  geom_bar(position="stack",stat="identity", width = 0.7) +
+  geom_text(size = 3, position = position_stack(vjust = 0.5))
+cluster_dis
+plot.nme = paste0(ggd,'_cluster_',clustering,'_angstdepressie_weighted_',weight_on ,'.png')
+plot.store <-paste0(plots.loc,plot.nme)
+ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, dpi=dpi)
 
 
 
-#crosstab incidentie mantelzorg geven
-ct_mz <- crosstab(ct$cl_kmeans, ct$MCMZGA205, weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
-                           dnn = c("cluster", "Mantelzorg verlenen"),
-                  expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
-ct_mz
+#crosstab incidentie regie op het leven
+ct_prop <- crosstab(ct$cl_kmeans, ct$GGRLS203, weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
+                    dnn = c("cluster", "lvl"),
+                    expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
+
+prop<- as.data.frame(ct_prop$prop.row*100)
+prop
+
+plot.title = paste0('cluster ',clustering,' * regie op het leven (weighted=',weight_on ,')')
+cluster_dis <-  ggplot(prop, aes(x =factor(cluster),y=Freq,fill=factor(lvl), label=round(Freq,0))) +
+  ggtitle(plot.title) +
+  theme_minimal() + 
+  theme(legend.position = "right") +
+  labs(x = "cluster", y="%") +
+  scale_fill_discrete(name = " ") +
+  geom_bar(position="stack",stat="identity", width = 0.7) +
+  geom_text(size = 3, position = position_stack(vjust = 0.5))
+cluster_dis
+plot.nme = paste0(ggd,'_cluster_',clustering,'_regieleven_weighted_',weight_on ,'.png')
+plot.store <-paste0(plots.loc,plot.nme)
+ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, dpi=dpi)
 
 
 
-#crosstab mantelzorg intensiteit
-#ct_mz_int <- crosstab(ct$cl_kmeans, ct$MCMZGA201, weight = ct$case_wei,chisq = TRUE,cell.layout = TRUE,
-#                  dnn = c("cluster", "Mantelzorg intensiteit"),
-#                  expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
-#ct_mz_int
+
+
+#crosstab incidentie ervaren gezondheid
+ct_prop <- crosstab(ct$cl_kmeans, ct$KLGGA207, weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
+                    dnn = c("cluster", "lvl"),
+                    expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
+
+prop<- as.data.frame(ct_prop$prop.row*100)
+prop
+
+plot.title = paste0('cluster ',clustering,' * ervaren gezondheid (weighted=',weight_on ,')')
+cluster_dis <-  ggplot(prop, aes(x =factor(cluster),y=Freq,fill=factor(lvl), label=round(Freq,0))) +
+  ggtitle(plot.title) +
+  theme_minimal() + 
+  theme(legend.position = "right") +
+  labs(x = "cluster", y="%") +
+  scale_fill_discrete(name = " ") +
+  geom_bar(position="stack",stat="identity", width = 0.7) +
+  geom_text(size = 3, position = position_stack(vjust = 0.5))
+cluster_dis
+plot.nme = paste0(ggd,'_cluster_',clustering,'_ervarengezondheid_weighted_',weight_on ,'.png')
+plot.store <-paste0(plots.loc,plot.nme)
+ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, dpi=dpi)
 
 
 
-#ervaren gezondheid
-#3 is slecht of zeer slecht
+#crosstab incidentie langdurige ziekte of -aandoening
+ct_prop <- crosstab(ct$cl_kmeans, ct$CALGA260, weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
+                    dnn = c("cluster", "lvl"),
+                    expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
 
-gez <- crosstab(ct$cl_kmeans, ct$KLGGA207, weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
-                      dnn = c("cluster", "Ervaren gezondheid"),
-                      expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
-gez
+prop<- as.data.frame(ct_prop$prop.row*100)
+prop
+
+plot.title = paste0('cluster ',clustering,' * langdurige ziekte of -aandoening (weighted=',weight_on ,')')
+cluster_dis <-  ggplot(prop, aes(x =factor(cluster),y=Freq,fill=factor(lvl), label=round(Freq,0))) +
+  ggtitle(plot.title) +
+  theme_minimal() + 
+  theme(legend.position = "right") +
+  labs(x = "cluster", y="%") +
+  scale_fill_discrete(name = " ") +
+  geom_bar(position="stack",stat="identity", width = 0.7) +
+  geom_text(size = 3, position = position_stack(vjust = 0.5))
+cluster_dis
+plot.nme = paste0(ggd,'_cluster_',clustering,'_langdurigziek_weighted_',weight_on ,'.png')
+plot.store <-paste0(plots.loc,plot.nme)
+ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, dpi=dpi)
 
 
-#heeft langdurig last van ziekte of aandoening
-chron <- crosstab(ct$cl_kmeans, ct$CALGA260, weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
-                dnn = c("cluster", "Langdurige ziekte of aandoening"),
-                expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
-chron
+
+#crosstab incidentie beperking gezondheid
+ct_prop <- crosstab(ct$cl_kmeans, ct$CALGA261, weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
+                    dnn = c("cluster", "lvl"),
+                    expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
+
+prop<- as.data.frame(ct_prop$prop.row*100)
+prop
+
+plot.title = paste0('cluster ',clustering,' * beperkt in activiteiten vanwege gezondheid  (weighted=',weight_on ,')')
+cluster_dis <-  ggplot(prop, aes(x =factor(cluster),y=Freq,fill=factor(lvl), label=round(Freq,0))) +
+  ggtitle(plot.title) +
+  theme_minimal() + 
+  theme(legend.position = "right") +
+  labs(x = "cluster", y="%") +
+  scale_fill_discrete(name = " ") +
+  geom_bar(position="stack",stat="identity", width = 0.7) +
+  geom_text(size = 3, position = position_stack(vjust = 0.5))
+cluster_dis
+plot.nme = paste0(ggd,'_cluster_',clustering,'_beperkt_gezondheid_weighted_',weight_on ,'.png')
+plot.store <-paste0(plots.loc,plot.nme)
+ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, dpi=dpi)
+
+
+
+#crosstab incidentie beperking horen, zien of mobiliteit
+ct_prop <- crosstab(ct$cl_kmeans, ct$LGBPS209, weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
+                    dnn = c("cluster", "lvl"),
+                    expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
+
+prop<- as.data.frame(ct_prop$prop.row*100)
+prop
+
+plot.title = paste0('cluster ',clustering,' * beperking horen, zien of mobiliteit (weighted=',weight_on ,')')
+cluster_dis <-  ggplot(prop, aes(x =factor(cluster),y=Freq,fill=factor(lvl), label=round(Freq,0))) +
+  ggtitle(plot.title) +
+  theme_minimal() + 
+  theme(legend.position = "right") +
+  labs(x = "cluster", y="%") +
+  scale_fill_discrete(name = " ") +
+  geom_bar(position="stack",stat="identity", width = 0.7) +
+  geom_text(size = 3, position = position_stack(vjust = 0.5))
+cluster_dis
+plot.nme = paste0(ggd,'_cluster_',clustering,'_beperkinghzm_weighted_',weight_on ,'.png')
+plot.store <-paste0(plots.loc,plot.nme)
+ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, dpi=dpi)
+
+
+#crosstab incidentie beperking mobiliteit
+ct_prop <- crosstab(ct$cl_kmeans, ct$LGBPS205, weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
+                    dnn = c("cluster", "lvl"),
+                    expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
+
+prop<- as.data.frame(ct_prop$prop.row*100)
+prop
+
+plot.title = paste0('cluster ',clustering,' * beperking mobiliteit (weighted=',weight_on ,')')
+cluster_dis <-  ggplot(prop, aes(x =factor(cluster),y=Freq,fill=factor(lvl), label=round(Freq,0))) +
+  ggtitle(plot.title) +
+  theme_minimal() + 
+  theme(legend.position = "right") +
+  labs(x = "cluster", y="%") +
+  scale_fill_discrete(name = " ") +
+  geom_bar(position="stack",stat="identity", width = 0.7) +
+  geom_text(size = 3, position = position_stack(vjust = 0.5))
+cluster_dis
+plot.nme = paste0(ggd,'_cluster_',clustering,'_beperking_mobi_weighted_',weight_on ,'.png')
+plot.store <-paste0(plots.loc,plot.nme)
+ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, dpi=dpi)
+
+
+
+#crosstab incidentie moeite rondkomen
+ct_prop <- crosstab(ct$cl_kmeans, ct$MMIKB201, weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
+                    dnn = c("cluster", "lvl"),
+                    expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
+
+prop<- as.data.frame(ct_prop$prop.row*100)
+prop
+
+plot.title = paste0('cluster ',clustering,' * moeite rondkomen (weighted=',weight_on ,')')
+cluster_dis <-  ggplot(prop, aes(x =factor(cluster),y=Freq,fill=factor(lvl), label=round(Freq,0))) +
+  ggtitle(plot.title) +
+  theme_minimal() + 
+  theme(legend.position = "right") +
+  labs(x = "cluster", y="%") +
+  scale_fill_discrete(name = " ") +
+  geom_bar(position="stack",stat="identity", width = 0.7) +
+  geom_text(size = 3, position = position_stack(vjust = 0.5))
+cluster_dis
+plot.nme = paste0(ggd,'_cluster_',clustering,'_beperking_rondkomen_weighted_',weight_on ,'.png')
+plot.store <-paste0(plots.loc,plot.nme)
+ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, dpi=dpi)
+
+
+#crosstab incidentie vermoeidheid
+ct_prop <- crosstab(ct$cl_kmeans, ct$GGADB201, weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
+                    dnn = c("cluster", "lvl"),
+                    expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
+
+prop<- as.data.frame(ct_prop$prop.row*100)
+prop
+
+plot.title = paste0('cluster ',clustering,' * vermoeidheid zonder duidelijke redenen (weighted=',weight_on ,')')
+cluster_dis <-  ggplot(prop, aes(x =factor(cluster),y=Freq,fill=factor(lvl), label=round(Freq,0))) +
+  ggtitle(plot.title) +
+  theme_minimal() + 
+  theme(legend.position = "right") +
+  labs(x = "cluster", y="%") +
+  scale_fill_discrete(name = " ") +
+  geom_bar(position="stack",stat="identity", width = 0.7) +
+  geom_text(size = 3, position = position_stack(vjust = 0.5))
+cluster_dis
+plot.nme = paste0(ggd,'_cluster_',clustering,'_vermoeidheid_weighted_',weight_on ,'.png')
+plot.store <-paste0(plots.loc,plot.nme)
+ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, dpi=dpi)
+
+
+#crosstab incidentie mantelzorg ontvangen
+ct_prop <- crosstab(ct$cl_kmeans, ct$MCMZOS304, weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
+                    dnn = c("cluster", "lvl"),
+                    expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
+
+prop<- as.data.frame(ct_prop$prop.row*100)
+prop
+
+plot.title = paste0('cluster ',clustering,' * mantelzorg ontvangen (weighted=',weight_on ,')')
+cluster_dis <-  ggplot(prop, aes(x =factor(cluster),y=Freq,fill=factor(lvl), label=round(Freq,0))) +
+  ggtitle(plot.title) +
+  theme_minimal() + 
+  theme(legend.position = "right") +
+  labs(x = "cluster", y="%") +
+  scale_fill_discrete(name = " ") +
+  geom_bar(position="stack",stat="identity", width = 0.7) +
+  geom_text(size = 3, position = position_stack(vjust = 0.5))
+cluster_dis
+plot.nme = paste0(ggd,'_cluster_',clustering,'_mantelzorg_ontvangen_weighted_',weight_on ,'.png')
+plot.store <-paste0(plots.loc,plot.nme)
+ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, dpi=dpi)
+
+
+#crosstab incidentie mantelzorger
+ct_prop <- crosstab(ct$cl_kmeans, ct$MCMZGS203, weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
+                    dnn = c("cluster", "lvl"),
+                    expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
+
+prop<- as.data.frame(ct_prop$prop.row*100)
+prop
+
+plot.title = paste0('cluster ',clustering,' * mantelzorger (weighted=',weight_on ,')')
+cluster_dis <-  ggplot(prop, aes(x =factor(cluster),y=Freq,fill=factor(lvl), label=round(Freq,0))) +
+  ggtitle(plot.title) +
+  theme_minimal() + 
+  theme(legend.position = "right") +
+  labs(x = "cluster", y="%") +
+  scale_fill_discrete(name = " ") +
+  geom_bar(position="stack",stat="identity", width = 0.7) +
+  geom_text(size = 3, position = position_stack(vjust = 0.5))
+cluster_dis
+plot.nme = paste0(ggd,'_cluster_',clustering,'_mantelzorger_weighted_',weight_on ,'.png')
+plot.store <-paste0(plots.loc,plot.nme)
+ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, dpi=dpi)
+
+
+
+#loopje
+#scat = function(x_var) {
+  
+#  ct_prop <- crosstab(ct$cl_kmeans, .data[[x_var]], weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
+ #                     dnn = c("cluster", "lvl"),
+#                      expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
+  
+#  prop<- as.data.frame(ct_prop$prop.row*100)
+#  print(prop)
+ #}
+
+#scat(ct$GGEES208)
+
+
 
 
 #gest. hh inkomen in kwintielen ct$inkkwin_2016 or KwintielInk
@@ -333,23 +614,26 @@ chron
 ink <- crosstab(ct$cl_kmeans, ct$KwintielInk, weight = ct$case_wei,chisq = TRUE,cell.layout = TRUE,
                   dnn = c("cluster", "Inkomen huishouden"),
                   expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
-ink
-
-
-#moeite met rondkomen
-#4 = grote moeite
-
-rk <- crosstab(ct$cl_kmeans, ct$MMIKB201, weight = ct$case_wei,chisq = TRUE,cell.layout = TRUE,
-                dnn = c("cluster", "Moeite met rondkomen"),
-                expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
-rk
+income<- ink$prop.row*100
+income
 
 
 #werkloos en werkzoekend
 wkl <- crosstab(ct$cl_kmeans, ct$MMWSA207, weight = ct$case_wei,chisq = TRUE,cell.layout = TRUE,
                dnn = c("cluster", "Werkloos en werkzoekend"),
                expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
-wkl
+
+unemployed<- wkl$prop.row*100
+unemployed
+
+
+#opleiding
+opl <- crosstab(ct$cl_kmeans, ct$Opleiding_samind, weight = ct$case_wei,chisq = TRUE,cell.layout = TRUE,
+                dnn = c("cluster", "Opleiding"),
+                expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
+
+education<- opl$prop.row*100
+education
 
 
 
@@ -357,7 +641,8 @@ wkl
 pen <- crosstab(ct$cl_kmeans, ct$MMWSA206, weight = ct$case_wei,chisq = TRUE,cell.layout = TRUE,
                 dnn = c("cluster", "Pensioen"),
                 expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
-pen
+pensionado<- pen$prop.row*100
+pensionado
 
 
 
@@ -365,8 +650,16 @@ pen
 huis <- crosstab(ct$cl_kmeans, ct$MMWSA210, weight = ct$case_wei,chisq = TRUE,cell.layout = TRUE,
                 dnn = c("cluster", "Huisvrouw/-man"),
                 expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
-huis
+home<- huis$prop.row*100
+home
 
+
+#vrijwilligerswerk
+vw <- crosstab(ct$cl_kmeans, ct$MMVWB201, weight = ct$case_wei,chisq = TRUE,cell.layout = TRUE,
+                 dnn = c("cluster", "Huisvrouw/-man"),
+                 expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
+care<- vw$prop.row*100
+care
 
 
 
@@ -401,25 +694,28 @@ huis
 #-------------------------------------------------------------------------------
 
 #Perspective : SES, situational
-#leeftijd70eo leeftijd 70 en ouder 
-#ervarengezondheid_dich gezondheid slecht 
-#inkomenlaag_dich inkomen laag
-#werkopleiding betaald werk, student 
-#geenbetaaldwerk geen betaald werk
-#opl_lm opleiding volwassenen laag midden
-#ziek_lt langdurige ziekten
-#MCMZOS304 mantelzorg ontvangen laatste 12 maanden
-#MCMZGA205 mantelzorg gegeven laatste 12 maanden
 
-dim_var <- c("cl_kmeans","leeftijd70eo","ervarengezondheid_dich","inkomenlaag_dich", "werkopleiding",
-             "opl_lm", "ziek_lt", "MCMZOS304", "MCMZGA205") 
+#leeftijd70eo : leeftijd 70 en ouder 
+#ervarengezondheid_dich : gezondheid slecht 
+#inkomenlaag_dich : inkomen laag
+#werkopleiding_dich : betaald werk, student 
+#geenbetaaldwerk : geen betaald werk REMOVED
+#opl_lm : opleiding volwassenen laag midden
+#ziek_lt : langdurige ziekten
+#MCMZOS304_dich : mantelzorg ontvangen laatste 12 maanden
+#mantelzorg_dich : mantelzorg gegeven laatste 12 maanden
+#vrijwilligerswerk_dich : verricht vrijwilligerswerk
+#vriendenkring_dich: vriendenkring is beperkt
+
+dim_var <- c("cl_kmeans","leeftijd70eo","ervarengezondheid_dich","inkomenlaag_dich", "werkopleiding_dich", "vrijwilligerswerk_dich",
+             "opl_lm", "ziek_lt", "mantelzorg_dich", "MCMZOS304_dich", "vriendenkring_dich") 
 
 #relevant variables for PCA
 sit <- z[, dim_var]
 
 #all numeric values
 sit[] <- lapply(sit, function(x) {
-  if(is.factor(x)) as.numeric(as.character(x)) else x
+  if(is.factor(x) | is.character(x)) as.numeric(as.character(x)) else x
 })
 
 sit[sit == 9] <- NA
@@ -483,7 +779,7 @@ dev.off()
 
 prop.table(dimens_comp$values)
 
-print(loadings(dimens_comp), cutoff=0.4)
+print(loadings(dimens_comp), cutoff=0.45)
 
 #dimens_comp$loadings
 

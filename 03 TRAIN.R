@@ -5,7 +5,7 @@
 # Train model
 # author : Mark Henry Gremmen, in cooperation with Gemma Smulders
 # DataScienceHub @ JADS, GGD Hart voor Brabant
-# lud 2019-08-01
+# lud 2019-11-08
 #-------------------------------------------------------------------------------
 
 #clear environment
@@ -24,7 +24,7 @@ if(any(!has_available)) install.packages(packages[!has_available])
 
 lapply(packages,library,character.only = TRUE)
 #review
-sessionInfo()
+#sessionInfo()
 
 
 #-------------------------------------------------------------------------------
@@ -38,18 +38,15 @@ root
 set.seed(123)  # for reproducibility
 options(digits=3)
 
-#set graphs location (if na, create directory first)
+#set graphs location 
 plots.loc <- paste0(root,'/PLOTS/')
 
-#set data location (if na, create directory first)
+#set data location 
 data.loc <- paste0(root,'/DATA/')
-
-#set library location (if na, create directory first)
-lib.loc <- paste0(root,'/LIB/')
 
 #source file name (csv-format)
 #make sure the filename corresponds with the paramaters used in procedure '01 DIMENSION'
-source.file <- paste0(data.loc,'Xfinal-zorgwekkend_df20-k7-p40.csv')
+source.file <- paste0(data.loc,'Xfinal-zorgwekkend_df25-k7-p35.csv')
 
 SOURCE <- read.csv(source.file, T, ",")
 
@@ -62,11 +59,20 @@ head(SOURCE)
 
 #original variables (not recoded, different likert scales) from the GGD Gezondheidsmonitor incl cluster membership cl_kmeans. 
 #cluster membership must reside at the last position if the list 
-cols <- c("GGADS201","KLGGB201","MMIKB201","CALGA260","CALGA261","LGBPS205","GGEEB201","GGEEB203",
-          "GGEEB204","GGEEB207","GGEEB208","GGRLB201","GGRLB202","GGRLB204","GGRLB206","GGADB201",
-          "GGADB202","GGADB204","GGADB207","GGADB210","cl_kmeans") 
+#cols <- c("GGADS201","KLGGB201","MMIKB201","CALGA260","CALGA261","LGBPS205","GGEEB201","GGEEB203",
+#          "GGEEB204","GGEEB207","GGEEB208","GGRLB201","GGRLB202","GGRLB204","GGRLB206","GGADB201",
+#          "GGADB202","GGADB204","GGADB207","GGADB210","cl_kmeans") 
+
+cols <- c("GGEES203","GGRLS202","GGADS201","KLGGA207", # <- outcome level
+          "MMIKB201","CALGA260","CALGA261","LGBPS209","AGGWS205","GGEEB201","GGEEB203","GGEEB204","GGEEB207",
+          "GGEEB208","GGRLB201","GGRLB202","GGRLB204","GGRLB206","GGADB201","GGADB202","GGADB204",
+          "GGADB207","GGADB210","GGEEB210","GGEEB211", "MCMZOS304","cl_kmeans") 
+
+SOURCE_SUBSET <- subset(SOURCE_ENRICHED, select = cols)
+
 SOURCE_SUBSET <- subset(SOURCE, select = cols)
 dim(SOURCE_SUBSET)
+
 #number of features
 df_tr <- ncol(SOURCE_SUBSET)
 df_tr
@@ -116,7 +122,6 @@ pca.train <- as.data.frame(pca.train)
 # NSP is cluster membership
 pca.train <- cbind(pca.train, NSP= train[,"cl_kmeans"])
 
-
 #table(observed=, predicted=)
 
 # predicting test data with pca
@@ -133,8 +138,8 @@ pca.test$NSP <- as.factor(pca.test$NSP)
 
 pca.train$NSP <- relevel(pca.train$NSP, ref = "1")
 
-# selecting first 10 variables, together they are responsible for more than 85% of the variability of the data
-# the number of dimensions effects teh accuracy rate of the model.
+# selecting first 10 components, together they are responsible for more than 85% of the variability of the data
+# the number of dimensions effects the accuracy rate of the model.
 # more dimensions is not always better
 # the PCA-method and the selective approach in the number of dimensions is a way to get lose noise
 
@@ -174,5 +179,3 @@ confusionMatrix(pred.test.rf, pca.test$NSP)
 
 #accuracy rate in the confusionmatrices indicate that randomForest is 
 #the best prediction model
-
-
