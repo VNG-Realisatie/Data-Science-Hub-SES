@@ -6,9 +6,9 @@
 # tecniques: imputation (IM), outlier analysis (OU), dimensional reduction (DR), clustering (CL), 
 # approach: unsupervised
 # requirements: R Statistics version  (3.60=<)
-# author : Mark Henry Gremmen, in cooperation with Gemma Smulders, Ester de Jonge
+# author : Mark Henry Gremmen, in cooperation with Gemma Smulders (HvB), Ester de Jonge (ZHZ)
 # DataScienceHub @ JADS, GGD Hart voor Brabant, GGD Zuid-Holland Zuid
-# lud 2019-11-08
+# lud 2019-11-22
 #------------------------------------------------------------------------------
 
 #clear environment
@@ -27,7 +27,7 @@ if(any(!has_available)) install.packages(packages[!has_available])
 
 lapply(packages,library,character.only = TRUE,quietly = TRUE)
 #review packages loaded
-#sessionInfo()
+sessionInfo()
 
 #-------------------------------------------------------------------------------
 # Global settings
@@ -40,6 +40,9 @@ root
 #ggd <- 'HVB' #Hart voor Brabant
 ggd <- 'ZHZ' #Zuid-Holland Zuid
 #ggd <- 'UTR' #Utrecht
+
+#source varariables manipulation location
+src.dir <- paste0(root,'/SRC/VARS.R')
 
 #set graphs location
 plots.dir <- paste0(root,'/PLOTS/')
@@ -57,7 +60,7 @@ lapply(locations, function(x) {
 
 #config
 set.seed(123)  # for reproducibility
-options(digits=10)
+options(digits=20)
 
 #respondent id = "volgnummer"
 
@@ -66,7 +69,7 @@ options(digits=10)
 #see DIMENSION.R section II. 'Optimal number of clusters'
 #determine the optimal number of clusters first before running the entire script
 #run the script to the point (including) section II first
-#the GAP plot will indicate the optimal number of clusters
+#the Silhoutte or GAP plot will indicate the optimal number of clusters
 #adjust 'k' accordingly below. 
 k <- 8
 
@@ -126,7 +129,7 @@ dim(SOURCE_RAW)
 # IDENTIFIER 
 
 #unique identifiers?
-sqldf("select count(distinct(volgnummer)) from SOURCE_RAW")
+sqldf("SELECT count(distinct(volgnummer)) FROM SOURCE_RAW")
 
 #define respondent id
 SOURCE_RAW$respondent_id <- as.character(SOURCE_RAW$volgnummer) 
@@ -144,18 +147,6 @@ head(SOURCE_RAW)
 #save source dataframe as Rdata set
 save(SOURCE_RAW,file=paste0(data.loc,"SOURCE_RAW",".Rda"))
 
-#GEO data was supplied seperately (due to AVG/GDPR)
-#if included in the main dataframe please comment the following block
-#geo.loc <- paste0(data.loc,"GGD-MONITOR-2016-GEO.sav")
-#GEO <- as.data.frame(read_spss(geo.loc))
-#GEO$respondent_id<- as.factor(GEO$volgnummer) 
-#GEO$respondent_id <- paste0("x",GEO$volgnummer)
-#GEO <- remove_rownames(GEO)
-#GEO <- column_to_rownames(GEO, var = "respondent_id")
-#GGD region
-#GEO$GGD <- ggd
-#head(GEO)
-
 #-------------------------------------------------------------------------------
 #DATA PREPARATION
 
@@ -168,180 +159,70 @@ save(SOURCE_RAW,file=paste0(data.loc,"SOURCE_RAW",".Rda"))
 #score_zw : hoge samenloop (op onderstaande items, 4<) (will be created on-the-fly) 
 
 
-#FEATURES (25 vars)
+#FEATURES 
 
-#zinvol bestaan / betekenisvol sociaal netwerk - 3 var
+#zinvol bestaan / betekenisvol sociaal netwerk 
 #MMWSA205, MMWSA211 : werk / opleiding 
-#MMVWB201 : vrijwilligerswerk NEW
-#MCMZGS203 : mantelzorger NEW
+#MMVWB201 : vrijwilligerswerk 
+#MCMZGS203 : mantelzorger 
 
-#eenzaamheid - 7 vars
+#eenzaamheid 
 #GGEEB201 : !Kan praten over dagelijkse problemen 
 #GGEEB203 : Ervaar leegte 
 #GGEEB204 : !mensen om op terug te vallen bij narigheid 
 #GGEEB207 : !Veel mensen om op te vertrouwen 
 #GGEEB208 : !Voldoende mensen waarmee verbondenheid is 
 
-#GGEEB210 : Voel me vaak in de steekgelaten NEW
-#GGEEB211 : !Kan bij vrienden terecht wanneer behoefte is NEW
+#GGEEB210 : Voel me vaak in de steekgelaten REMOVE
+#GGEEB211 : !Kan bij vrienden terecht wanneer behoefte is REMOVE
 
-#gezondheid en beperkingen - 5 vars 
+#gezondheid en beperkingen
 #CALGA260 : Heeft langdurige ziekte(n) of aandoening(en) 
 #CALGA261 : Is (ernstig) beperkt in activiteiten vanwege gezondheid 
-#LGBPS209 : Heeft minimaal een beperking met horen, zien of mobiliteit (ofwel minimaal grote moeite met 1 vd 7 OECD items)
-#AGGWS205 : Obesitas, ofwel een BMI van 30 of hoger NEW
 #MMIKB201 : moeite met rondkomen 
 
-#angst en depressie - 5 vars
+#LGBPS209 : Heeft minimaal een beperking met horen, zien of mobiliteit (ofwel minimaal grote moeite met 1 vd 7 OECD items) REMOVE
+#LGBPS203 : beperking horen
+#LGBPS204 : beperking zien
+#LGBPS205 : beperking mobiliteit
+
+#lifestyle/gedrag
+#AGGWS205 : Obesitas, ofwel een BMI van 30 of hoger
+#LFALA213 : zware drinker
+#LFRKA205 : roker
+# beweegnorm / fitnorm ADD 
+
+#angst en depressie
 #GGADB201 : Vaak vermoeid zonder duidelijke reden 
 #GGADB202 : Vaak zenuwachtig 
 #GGADB204 : Vaak hopeloos 
 #GGADB207 : Vaak somber of depressief
 #GGADB210 : Vaak afkeurenswaardig, minderwaardig of waardeloos
 
-#regie op het leven - 5 vars
+#regie op het leven
 #GGRLB201 : Weinig controle over dingen die mij overkomen
 #GGRLB202 : Sommige van mijn problemen kan ik met geen mogelijkheid oplossen
 #GGRLB204 : Ik voel me vaak hulpeloos bij omgaan problemen van het leven
 #GGRLB206 : Wat er in de toekomst met me gebeurt hangt voor grootste deel van mezelf af
-#MCMZOS304 : mantelzorg ontvangen NEW
+#MCMZOS304 : mantelzorg ontvangen
 
-#create new recoded variables
-#ervarengezondheid_dich 1 '(zeer) slecht' 0 'matig tot (zeer) goed)'
-SOURCE_RAW$ervarengezondheid_dich = recode(SOURCE_RAW$KLGGA207, "3=1; 1=0; 2=0; 9=NA")
-
-#regie_dich 1 'onvoldoende regie' 0 'matig of veel regie'
-SOURCE_RAW$regie_dich = recode(SOURCE_RAW$GGRLS203, "0=1; 1=0; 9=NA")
-
-#angstdepressie_dich 1 '(zeer) hoog' 0 'niet of nauwelijks'
-SOURCE_RAW$angstdepressie_dich <-0
-SOURCE_RAW$angstdepressie_dich[SOURCE_RAW$GGADS201>22] <-1
-SOURCE_RAW$angstdepressie_dich[SOURCE_RAW$GGADS201==9] <- NA
-
-#eenzaamheid_dich 1 '(zeer) ernstig eenzaam' 0 'niet of matig eenzaam'
-SOURCE_RAW$eenzaamheid_dich = recode(SOURCE_RAW$GGEES209, "1=1; 0=0; 8=0; 9=NA")
-
-#werkopleiding 'betaald werk, student' 
-SOURCE_RAW$werkopleiding <- 0
-SOURCE_RAW$werkopleiding[SOURCE_RAW$MMWSA205==1 | SOURCE_RAW$MMWSA211==1] <- 1
-SOURCE_RAW$werkopleiding[SOURCE_RAW$MMWSA205==9 & SOURCE_RAW$MMWSA211==9] <- NA
-
-#vrijwilligerswerk NEW
-SOURCE_RAW$vrijwilligerswerk <-0
-SOURCE_RAW$vrijwilligerswerk[SOURCE_RAW$MMVWB201==1] <-1
-SOURCE_RAW$vrijwilligerswerk[SOURCE_RAW$MMVWB201==9] <-NA
-
-#mantelzorger NEW
-SOURCE_RAW$mantelzorg[SOURCE_RAW$MCMZGS203==0] <-0
-SOURCE_RAW$mantelzorg[SOURCE_RAW$MCMZGS203==1] <-1
-SOURCE_RAW$mantelzorg[SOURCE_RAW$MCMZGS203==9] <-NA
-
-#vriendenkring NEW
-SOURCE_RAW$vriendenkring <-0
-SOURCE_RAW$vriendenkring[SOURCE_RAW$GGEEB206==2 | SOURCE_RAW$GGEEB206==3] <-1
-SOURCE_RAW$vriendenkring[SOURCE_RAW$GGEEB206==9] <-NA
-
-#goedevriend NEW
-SOURCE_RAW$goedevriend <-0
-SOURCE_RAW$goedevriend[SOURCE_RAW$GGEEB202==2 | SOURCE_RAW$GGEEB202==3] <-1
-SOURCE_RAW$goedevriend[SOURCE_RAW$GGEEB202==9] <-NA
-
-#mensen om me heen NEW
-SOURCE_RAW$mensenomheen <-0
-SOURCE_RAW$mensenomheen[SOURCE_RAW$GGEEB209==2 | SOURCE_RAW$GGEEB209==3] <-1
-SOURCE_RAW$mensenomheen[SOURCE_RAW$GGEEB209==9] <-NA
-
-#inkkwin_2016 'Gestandaardiseerd huishoudinkomen in kwintielen (numerieke variabele)'
-#inkkwin_2016 1 '0 tot 20% (max 16.100 euro)' 2 '20 tot 40% (max 21.300 euro)' 3 '40 tot 60% (max 27.200 euro)'
-#4 '60 tot 80% (max 35.100 euro)' 5 '80 tot 100% (> 35.100 euro)' 9 'onbekend'.
-
-#inkomenzeerlaag_dich 1 'zeer laag, max 16.100 euro' 0 'hoger'
-#SOURCE_RAW$inkomenzeerlaag_dich = recode(SOURCE_RAW$inkkwin_2016, "1=1; 2=0; 3=0; 4=0; 5=0; 9=NA")
-SOURCE_RAW$inkomenzeerlaag_dich = recode(SOURCE_RAW$KwintielInk, "1=1; 2=0; 3=0; 4=0; 5=0; 9=NA")
-
-#inkomenlaag_dich 1 'laag, max 21.300 euro' 0 'hoger'
-#SOURCE_RAW$inkomenlaag_dich = recode(SOURCE_RAW$inkkwin_2016, "1=1; 2=1; 3=0; 4=0; 5=0; 9=NA")
-SOURCE_RAW$inkomenlaag_dich = recode(SOURCE_RAW$KwintielInk, "1=1; 2=1; 3=0; 4=0; 5=0; 9=NA")
-
-#leeftijdcat6  'leeftijd in 6 categorieen obv geboortedatum' 
-SOURCE_RAW$leeftijdcat6 = recode(SOURCE_RAW$Lftklassen, "1=1; 2:4=2; 5:7=3; 8:9=4; 10:11=5; 12:14=6; 99=NA")
-
-#leeftijd70eo 'leeftijd 70 jaar of ouder'
-SOURCE_RAW$leeftijd70eo = recode(SOURCE_RAW$Lftklassen, "11=1; 12=1; 13=1; 14=1; 99=NA; else=0")
-
-#opl_lm opleiding laag midden 1
-#SOURCE_RAW$opl_lm = recode(SOURCE_RAW$opl_dichVM, "0=0; 1=1; 9=NA")
-SOURCE_RAW$opl_lm = recode(SOURCE_RAW$Opleiding_samind, "1=1; 2=1; 3=0; 4=0; 9=NA")
-
-#ziek_lt langdurige ziekten
-SOURCE_RAW$ziek_lt = recode(SOURCE_RAW$CALGB260, "1=1; 2=0; 9=NA")
-
-#depri_hg matig of hoog risico op angst en depressie
-SOURCE_RAW$depri_hg = recode(SOURCE_RAW$GGADA202, "0=0; 1=1; 9=NA")
-
-
-#NORMALIZE DATA
-#Recoding -where needed- into new dichotomous variable with the same direction of the loadings (0=NO ISSUE)
-SOURCE_RAW$werkopleiding_dich = recode(SOURCE_RAW$werkopleiding, "1=0; 0=1;")
-
-SOURCE_RAW$vrijwilligerswerk_dich = recode(SOURCE_RAW$vrijwilligerswerk, "1=0; 0=1;")
-
-#okay, mz is not a social activity (but is a meaningful social relation)
-SOURCE_RAW$mantelzorg_dich = recode(SOURCE_RAW$mantelzorg, "1=0; 0=1;")
-
-SOURCE_RAW$vriendenkring_dich = recode(SOURCE_RAW$vriendenkring, "1=0; 0=1;")
-
-SOURCE_RAW$goedevriend_dich = recode(SOURCE_RAW$goedevriend, "1=0; 0=1;")
-
-SOURCE_RAW$mensenomheen_dich = recode(SOURCE_RAW$mensenomheen, "1=0; 0=1;")
-
-SOURCE_RAW$MMIKB201_dich = recode(SOURCE_RAW$MMIKB201, "4=1; 3=0; 2=0; 1=0")
-
-SOURCE_RAW$GGEEB201_dich = recode(SOURCE_RAW$GGEEB201, "3=1; 2=0; 1=0")
-
-SOURCE_RAW$GGEEB203_dich = recode(SOURCE_RAW$GGEEB203, "1=1; 2=0; 3=0")
-
-SOURCE_RAW$GGEEB204_dich = recode(SOURCE_RAW$GGEEB204, "3=1; 2=0; 1=0")
-
-SOURCE_RAW$GGEEB207_dich = recode(SOURCE_RAW$GGEEB207, "3=1; 2=0; 1=0")
-
-SOURCE_RAW$GGEEB208_dich = recode(SOURCE_RAW$GGEEB208, "3=1; 2=0; 1=0")
-
-SOURCE_RAW$GGEEB210_dich = recode(SOURCE_RAW$GGEEB210, "1=1; 2=0; 3=0")
-
-SOURCE_RAW$GGEEB211_dich = recode(SOURCE_RAW$GGEEB211, "3=1; 2=0; 1=0")
-
-SOURCE_RAW$GGRLB201_dich = recode(SOURCE_RAW$GGRLB201, "1=1; 2=0; 3=0; 4=0; 5=0")
-
-SOURCE_RAW$GGRLB202_dich = recode(SOURCE_RAW$GGRLB202, "1=1; 2=0; 3=0; 4=0; 5=0")
-
-SOURCE_RAW$GGRLB204_dich = recode(SOURCE_RAW$GGRLB204, "1=1; 2=0; 3=0; 4=0; 5=0")
-
-SOURCE_RAW$GGRLB206_dich = recode(SOURCE_RAW$GGRLB206, "1=1; 2=0; 3=0; 4=0; 5=0")
-
-SOURCE_RAW$GGADB201_dich = recode(SOURCE_RAW$GGADB201, "1=1; 2=1; 3=0; 4=0; 5=0")
-
-SOURCE_RAW$GGADB202_dich = recode(SOURCE_RAW$GGADB202, "1=1; 2=1; 3=0; 4=0; 5=0")
-
-SOURCE_RAW$GGADB204_dich = recode(SOURCE_RAW$GGADB204, "1=1; 2=1; 3=0; 4=0; 5=0")
-
-SOURCE_RAW$GGADB207_dich = recode(SOURCE_RAW$GGADB207, "1=1; 2=1; 3=0; 4=0; 5=0")
-
-SOURCE_RAW$GGADB210_dich = recode(SOURCE_RAW$GGADB210, "1=1; 2=1; 3=0; 4=0; 5=0")
-
-SOURCE_RAW$MCMZOS304_dich = recode(SOURCE_RAW$MCMZOS304, "0=0; 1=1; 9=NA")
+#variable manipulation (see directory SRC > VARS.R)
+source(src.dir)
 
 SOURCE_ENRICHED <- SOURCE_RAW
 
 #remove source raw file
 rm(SOURCE_RAW)
 
-#SOURCE_ENRICHED$respondent_id <- paste0("x",SOURCE_ENRICHED$volgnummer)
-
-#SOURCE_ENRICHED <- remove_rownames(SOURCE_ENRICHED)
-#SOURCE_ENRICHED <- column_to_rownames(SOURCE_ENRICHED, var = "respondent_id")
-
 save(SOURCE_ENRICHED,file=paste0(data.loc,"SOURCE_ENRICHED",".Rda"))
+
+
+#-------------------------------------------------------------------------------
+# Filtering
+
+SOURCE_SUBSET <- SOURCE_ENRICHED
+#municipality filter
+#SOURCE_SUBSET <- SOURCE_ENRICHED[SOURCE_ENRICHED$Gemeentecode>1,]
 
 
 #-------------------------------------------------------------------------------
@@ -350,17 +231,28 @@ save(SOURCE_ENRICHED,file=paste0(data.loc,"SOURCE_ENRICHED",".Rda"))
 #features : first four are higher-order outcome dimensions
 #if you add features, please do so add the end of the list
 #only add dichotomized features (which indicicate experienced issues/vulnerability, vitality or resilience)
+
 cols <- c("GGEES203","GGRLS202","GGADS201","KLGGA207", # <- outcome level
           "werkopleiding_dich", "vrijwilligerswerk_dich", "mantelzorg_dich", # <- zinvol bestaan
-          "MMIKB201_dich","CALGA260","CALGA261","LGBPS209","AGGWS205","GGEEB201_dich","GGEEB203_dich","GGEEB204_dich","GGEEB207_dich",
-          "GGEEB208_dich","GGRLB201_dich","GGRLB202_dich","GGRLB204_dich","GGRLB206_dich","GGADB201_dich","GGADB202_dich","GGADB204_dich",
-          "GGADB207_dich","GGADB210_dich","GGEEB210_dich","GGEEB211_dich", "MCMZOS304_dich") 
-SOURCE_SUBSET <- subset(SOURCE_ENRICHED, select = cols)
+          # perception in outcome features -> 
+          #eenzaamheid
+          "GGEEB201_dich","GGEEB203_dich","GGEEB204_dich","GGEEB207_dich","GGEEB208_dich",
+          #"GGEEB210", "GGEEB211" # in de tseek gelaten, kan bij vrienden terecht
+          #gezondheid en beperkingen
+          "CALGA260","CALGA261","LGBPS209","MMIKB201_dich",
+          #angst en depressie
+          "GGRLB201_dich","GGRLB202_dich","GGRLB204_dich","GGADB207_dich","GGADB210_dich",
+          #regie op het leven
+          "GGADB201_dich","GGADB202_dich","GGADB204_dich","GGRLB206_dich", "MCMZOS304", 
+          #lifestyle/gedrag
+          "LFALA213", "LFRKA205", "AGGWS205")
+          
+SOURCE_SUBSET <- subset(SOURCE_SUBSET, select = cols)
 
 #append '_dich' to variable name of the remaining variables not containing '_dich'
 colnames(SOURCE_SUBSET) <- sub("^(?!.*_dich)(.*)", "\\1_dich", colnames(SOURCE_SUBSET), perl=TRUE)
 
-#proxy for level of issues: 'hoge samenloop / multi-problematiek' start column range after outcome level indicators
+#proxy for level of issues: 'hoge samenloop / multi-problematiek' start column range after outcome level and zinvol bestaan indicators
 score_zw <- SOURCE_SUBSET %>%
   mutate (score_zw = rowSums(SOURCE_SUBSET[,8:ncol(SOURCE_SUBSET)],na.rm=TRUE))
 
@@ -374,14 +266,14 @@ bin_outcome <- SOURCE_SUBSET %>%
   mutate(zw_bin = binning(SOURCE_SUBSET$score_zw),
          dep_bin = binning(SOURCE_SUBSET$GGADS201_dich),
          reg_bin = binning(SOURCE_SUBSET$GGRLS202_dich)
-         )
+  )
 
 
 #regie en samenloop
 plot.title = paste0('Gebrek aan regie * samenloop')
 bp1 <- ggplot(bin_outcome, aes(y = GGRLS202_dich, x = zw_bin, fill=zw_bin)) + 
   geom_boxplot(width=0.6,  colour = I("#3366FF")) +
- # geom_point(data=a,aes(x=cl_kmeans,y=samenloop_w),shape = 23, size = 3, fill ="red",inherit.aes=FALSE) +
+  # geom_point(data=a,aes(x=cl_kmeans,y=samenloop_w),shape = 23, size = 3, fill ="red",inherit.aes=FALSE) +
   theme_minimal() +
   xlab("level of samenloop") +
   ylab("gebrek aan regie") +
@@ -406,7 +298,7 @@ bp2 <- ggplot(bin_outcome, aes(x = reg_bin, y = score_zw, fill=reg_bin)) +
 bp2
 plot.nme = paste0(ggd,'_explore_samenloop_gebrekregie.png')
 plot.store <-paste0(plots.loc,plot.nme)
-ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, dpi=dpi)
+ggsave(plot.store, height = graph_height, width = graph_height * aspect_ratio, dpi=dpi)
 
 #samenloop en angst & depressie
 plot.title = paste0('Samenloop * angst en depressie')
@@ -421,8 +313,7 @@ bp3 <- ggplot(bin_outcome, aes(x = dep_bin, y = score_zw, fill=dep_bin)) +
 bp3
 plot.nme = paste0(ggd,'_explore_samenloop_angstendepressie.png')
 plot.store <-paste0(plots.loc,plot.nme)
-ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, dpi=dpi)
-
+ggsave(plot.store, height = graph_height, width = graph_height * aspect_ratio, dpi=dpi)
 
 
 #inclusion criteria
@@ -431,12 +322,13 @@ ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, 
 #ervaren gezondheid en / of hoge samenloop van problematiek
 #adjust threshold gebrek aan regie en samenloop based on binning and boxplot results (see above)
 
-SOURCE_SUBSET <- SOURCE_SUBSET[ which(SOURCE_SUBSET$GGEES203_dich>8 #eenzaamheid
+
+SOURCE_SUBSET <- SOURCE_SUBSET[ which(SOURCE_SUBSET$GGEES203_dich>8 #eenzaamheid 
                                       | SOURCE_SUBSET$GGRLS202_dich<23 #regie op het leven 
                                       | SOURCE_SUBSET$GGADS201_dich>20 #angststoornis of depressie
                                       | SOURCE_SUBSET$KLGGA207_dich==3 #ervaren gezondheid 
                                       | SOURCE_SUBSET$score_zw>4) #samenloop
-                                      , ]
+                                , ]
 
 #remove outcome variables, keep relevant variables for the fingerprint
 SOURCE_SUBSET <- subset(SOURCE_SUBSET, select = -c(GGEES203_dich,GGRLS202_dich,GGADS201_dich,KLGGA207_dich,score_zw))
@@ -470,7 +362,7 @@ head(SEQ,5)
 
 #-------------------------------------------------------------------------------
 # Missing values and imputatation
- 
+
 #stats on missing values (pre-imputation)
 sapply(SOURCE_SUBSET, function(x) sum(is.na(x)))
 
@@ -493,7 +385,7 @@ fplot
 dev.off()
 
 #initial run to auto-determine powerful predictors for imputation
-ini <- mice(SOURCE_SUBSET,pred=quickpred(SOURCE_SUBSET, mincor=.3),seed=500, print=F)
+ini <- mice(SOURCE_SUBSET,pred=quickpred(SOURCE_SUBSET, mincor=.35),seed=500, print=F)
 #predictor matrix
 (pred <- ini$pred)
 
@@ -501,23 +393,30 @@ save(pred, file = "prediction_matrix_features.RData")
 
 #pred <- load("prediction_matrix_features.RData")
 
-#final run
+#first run (low number of iterations)
 imp_data <- mice(SOURCE_SUBSET,method = "logreg", pred=pred,m=5,maxit=10,seed=500, print=T)
 
 summary(imp_data)
 
 #convergence
 #it is important that convergence is taking effect towards the end of the iteration process
-plot(imp_data)
 
-#do additional iterations lead to better convergence than maxit 10?
-imp_ext <- mice.mids(imp_data, maxit=20, print=F)
-
-plot.nme = paste0(ggd,'_convergence_imputation_iterations.png')
+plot.nme = paste0(ggd,'_convergence_imputation_iterations_first_run.png')
 plot.store <-paste0(plots.loc,plot.nme)
 png(filename=plot.store,height = png_height,width = png_height * aspect_ratio)
-cplot <- plot(imp_ext)
-cplot
+cplot_1 <- plot(imp_data)
+cplot_1
+dev.off()
+
+#second run
+#do additional iterations lead to better convergence than in first run?
+imp_ext <- mice.mids(imp_data, maxit=15, print=F)
+
+plot.nme = paste0(ggd,'_convergence_imputation_iterations_second_run.png')
+plot.store <-paste0(plots.loc,plot.nme)
+png(filename=plot.store,height = png_height,width = png_height * aspect_ratio)
+cplot_2 <- plot(imp_ext)
+cplot_2
 dev.off()
 
 #if so, use the extended version (otherwize adjust maxit in mice.mids)
@@ -536,7 +435,7 @@ SOURCE_SUBSET <- complete(imp_data)
 
 #stats on missing values (post-imputation). All gone!
 sapply(SOURCE_SUBSET, function(x) sum(is.na(x)))
-head(SOURCE_SUBSET)
+#head(SOURCE_SUBSET)
 
 #-------------------------------------------------------------------------------
 # Re-attach respondent id
@@ -556,13 +455,13 @@ head(SOURCE_SUBSET,2)
 #-------------------------------------------------------------------------------
 # Collinearity
 #low correlation is good
-plot.nme = paste0(ggd,'_correlation_features.png')
-plot.store <-paste0(plots.loc,plot.nme)
-png(filename=plot.store,height = png_height,width = png_height * aspect_ratio)
-mdf <- data.matrix(SOURCE_SUBSET) # convert to numeric matrix for correlation calculation 
-corplot <- corrplot(cor(mdf), method="color",type="upper")
-(corplot)
-dev.off()
+#plot.nme = paste0(ggd,'_correlation_features.png')
+#plot.store <-paste0(plots.loc,plot.nme)
+#png(filename=plot.store,height = png_height,width = png_height * aspect_ratio)
+#mdf <- data.matrix(SOURCE_SUBSET) # convert to numeric matrix for correlation calculation 
+#corplot <- corrplot(cor(mdf), method="color",type="upper")
+#(corplot)
+#dev.off()
 
 
 #-------------------------------------------------------------------------------
@@ -595,10 +494,9 @@ plot.nme = paste0(ggd,'_outliers_distribution.png')
 plot.store <-paste0(plots.loc,plot.nme)
 ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio,dpi = dpi)
 
-
 # Binary outlier variable
 # threshold determined by lower boundary of last valid bin, see outlier distribution plot 
-threshold_zw <- 54.8 # Threshold ZHZ : 48.2 , HvB : 35.1 (higher value means more outliers in scope)
+threshold_zw <- 48.9 # Threshold UTR: 51.5, ZHZ : 54.2 , HvB : 35.1 (higher value means more outliers in scope)
 SOURCE_SUBSET$outlier <- "No"
 SOURCE_SUBSET$outlier[SOURCE_SUBSET$MD > threshold_zw] <- "Yes"  
 
@@ -638,9 +536,8 @@ cols.srce.nme <- paste0(data.loc, "analysis-subset-",dest.nme.var, ".csv")
 write.csv(ANALYSIS_SUBSET, file=cols.srce.nme)
 
 #Bartlettas test of sphericity (test for homogeneity of variances) : check if data reduction is possible
-#significance level must reside below of 0.05
+#significance level must reside well below of 0.05
 bartlett.test(ANALYSIS_SUBSET)
-
 
 
 #-------------------------------------------------------------------------------
@@ -725,9 +622,7 @@ rm(tsne_core)
 #-------------------------------------------------------------------------------
 # Clustering tendency
 
-#if you wonder whether the cases will cluster, run the part below
-#Hopkins statistic: If the value of Hopkins statistic is close to zero (far below 0.5), then dataset is significantly clusterable. 
-
+#Hopkins statistic
 #gradient_col = list(low = "steelblue", high = "white")
 #get_clust_tendency(tsne, n = 50, gradient = gradient_col)
 
@@ -749,12 +644,12 @@ plot.store <-paste0(plots.loc,plot.nme)
 #  labs(subtitle = "Elbow method")
 
 # Silhouette method
-#fviz_nbclust(tsne_sub, kmeans, method = "silhouette") +
-#  labs(subtitle = "Silhouette method")
+fviz_nbclust(tsne_sub, kmeans, method = "silhouette") +
+  labs(subtitle = "Silhouette method")
 
 # GAP method (regular, 10 iterations)
-fviz_nbclust(tsne_sub, kmeans, method = "gap_stat")+
-  labs(subtitle = "GAP method")
+#fviz_nbclust(tsne_sub, kmeans, method = "gap_stat")+
+#  labs(subtitle = "GAP method")
 
 # GAP heavy-duty version (when regular not converging)
 #CusKmeansFUN <- function(x,k) list(cluster=kmeans(x, k, iter.max=50))
@@ -764,6 +659,8 @@ fviz_nbclust(tsne_sub, kmeans, method = "gap_stat")+
 ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio,dpi = dpi)
 
 #reset k?
+
+
 
 #-------------------------------------------------------------------------------
 # II.1 TSNE (DR) > kmeans (CL)
@@ -802,19 +699,24 @@ tsne_km_ext$V2 <- as.numeric(as.character(tsne_km_ext$V2))
 ## plotting the results with Kmeans clustering
 plot.title = paste0('TSNE > Kmeans of ',dest.nme.var, ' k=',k,' perplexity=',perplex)
 ggplot(tsne_km_ext, aes(V1, V2, color = cl_kmeans)) +
-        geom_point() + 
-        ggtitle(plot.title) +
+  geom_point() + 
+  ggtitle(plot.title) +
   theme_minimal() +
   xlab('') +
   ylab('') +
-#geom_text(aes(label=row.names(X)),color="#ababab") +
-scale_colour_manual(name = "cluster",values=colors_cust) + 
-geom_text(aes(label = ""), size = 3, vjust = 1, color = "black")
+  #geom_text(aes(label=row.names(X)),color="#ababab") +
+  scale_colour_manual(name = "cluster",values=colors_cust) + 
+  geom_text(aes(label = ""), size = 3, vjust = 1, color = "black")
 plot.nme = paste0('tsne_kmeans_',dest.nme.var,'_k',k,'_p',perplex,'.png')
 plot.store <-paste0(plots.loc,plot.nme)
 ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio,dpi = dpi)
 
-km_cl <- left_join(tsne_store, tsne_km, left_index=True, right_index=True,all=TRUE)
+km_cl <- merge(tsne_store, tsne_km, by=0, all.x=T, keep=F)
+row.names(km_cl) <- km_cl[,1]
+#km_cl <- km_cl[,c(2,3,6)]
+
+#names(km_cl)[names(km_cl) == 'V1.x'] <- 'V1'
+#names(km_cl)[names(km_cl) == 'V2.x'] <- 'V2'
 
 #add clustermemberschip to Tsne dataframe
 tsne_store$cl_kmeans <- km_cl$cl_kmeans 
@@ -831,7 +733,7 @@ plot.nme = paste0('tsne_pam_',dest.nme.var,'_k',k,'_p',perplex,'.png')
 plot.store <-paste0(plots.loc,plot.nme)
 title = paste0('TSNE > K-mediods (PAM) of ',dest.nme.var, ' k=',k)
 fviz_cluster(pam_res, geom = "point", ellipse.type = "convex") +
-labs(title = title)
+  labs(title = title)
 ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio,dpi = dpi)
 
 #add clustermemberschip to Tsne dataframe
@@ -874,49 +776,6 @@ tsne_store$cl_hierarchical = as.factor(factor(cutree(fit_hca_tsne, k=k)))
 #as.data.frame(tsne_original)
 
 head(tsne_store,2)
-
-
-#-------------------------------------------------------------------------------
-# II.4 TSNE (DR) > DBSCAN (CL) (optional)
-#Density-based spatial clustering of applications with noise
-
-#d_tsne_mat <- as.matrix(tsne_sub)
-
-#kNNdistplot(d_tsne_mat, k=4)
-#abline(h=0.4, col="red")
-
-#db <- dbscan(d_tsne_mat,eps = .4, MinPts = 4)
-#db
-
-#hullplot(d_tsne_mat, db$cluster)
-#table(tsne_store$cl_kmeans,db$cluster)
-
-#pairs(tsne_sub, col = db$cluster + 1L)
-
-# Local outlier factor 
-#lof <- lof(tsne_sub, k = 4)
-#pairs(tsne_sub, cex = lof)
-
-#OPTICS
-#opt <- optics(tsne_sub, eps = 1, minPts = 4)
-#opt
-
-#opt <- extractDBSCAN(opt, eps_cl = .4)
-#plot(opt)
-
-#opt <- extractXi(opt, xi = .05)
-#opt
-#plot(opt)
-
-#hdb <- hdbscan(tsne_sub, minPts = 4)
-
-#plot(hdb, show_flat = T)
-
-#colors <- mapply(function(col, i) adjustcolor(col, alpha.f = hdb$membership_prob[i]), 
-#                 palette()[hdb$cluster+1], seq_along(hdb$cluster))
-#plot(d_tsne, col=colors, pch=20)
-
-#tsne_original$cl_hdbscan <-as.factor(hdb$cluster)
 
 
 #-------------------------------------------------------------------------------
@@ -999,7 +858,7 @@ ZW$volgnummer <- gsub("x","",ZW$volgnummer)
 z<- NULL
 y <- merge(SOURCE_ENRICHED, tsne_store,all=T, by='volgnummer')
 z <- merge(y,ZW,all=T, by='volgnummer')
-
+rm(y)
 
 #dichotomize clustermembership Kmeans per clusters 
 for (cluster in 1:k){

@@ -5,9 +5,9 @@
 # scope : Kmeans cluster definition and -loading
 # techniques : Principal component (PCA), aggregating, plotting
 # requirements: R Statistics version  (3.60=<)
-# author : Mark Henry Gremmen, in cooperation with Gemma Smulders, Ester de Jonge
+# author : Mark Henry Gremmen, in cooperation with Gemma Smulders (HvB), Ester de Jonge (ZHZ)
 # DataScienceHub @ JADS, GGD Hart voor Brabant, GGD Zuid-Holland Zuid
-# lud 2019-11-15
+# lud 2019-11-22
 #-------------------------------------------------------------------------------
 
 #clear environment
@@ -37,7 +37,8 @@ root
 
 #GGD dep.
 #ggd <- 'HVB' #Hart voor Brabant
-ggd <- 'ZHZ' #Zuid-Holland Zuid
+#ggd <- 'ZHZ' #Zuid-Holland Zuid
+ggd <- 'UTR' #Utrecht
 
 #set graphs location
 plots.loc <- paste0(root,'/PLOTS/',ggd,'/')
@@ -47,12 +48,12 @@ data.loc <- paste0(root,'/DATA/',ggd,'/')
 
 #options
 set.seed(123)  # for reproducibility
-options(digits=10)
+options(digits=20)
 
 #number of clusters (Kmeans, Hierarchical Cluster Analysis) 
 #always (re)check the optimal number of clusters!!!
 #see DIMENSION.R section II. 'Optimal number of clusters'
-k <- 8
+k <- 7
 
 #number of factors (PCA)
 f <- 4
@@ -104,7 +105,7 @@ wei_vec <- as.vector(z$case_wei)
 vulnerable <- wpct(z$vulnerable, weight=wei_vec, na.rm=FALSE)*100
 print(vulnerable)
 
-write.table(vulnerable, file = paste0(data.loc,"weigthed_vulnerable_distribution",".csv"))
+write.table(vulnerable, file = paste0(data.loc,"weigthed_vulnerable_distribution",clustering,".csv"))
 
 
 #Cluster membership distribution (weigthed) (pct)
@@ -208,7 +209,6 @@ ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, 
 #please note that the weighted mean presented in the box plots is indicated by the red dot
 
 #leeftijd
-#z$leeftijd <- as.numeric(z$leeftijd)
 z$leeftijd <- as.numeric(z$LFT0109)
 
 
@@ -378,9 +378,6 @@ plot.store <-paste0(plots.loc,plot.nme)
 ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, dpi=dpi)
 
 
-
-
-
 #crosstab incidentie ervaren gezondheid
 ct_prop <- crosstab(ct$cl_kmeans, ct$KLGGA207, weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
                     dnn = c("cluster", "lvl"),
@@ -402,7 +399,6 @@ cluster_dis
 plot.nme = paste0(ggd,'_cluster_',clustering,'_ervarengezondheid_weighted_',weight_on ,'.png')
 plot.store <-paste0(plots.loc,plot.nme)
 ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, dpi=dpi)
-
 
 
 #crosstab incidentie langdurige ziekte of -aandoening
@@ -450,7 +446,6 @@ cluster_dis
 plot.nme = paste0(ggd,'_cluster_',clustering,'_beperkt_gezondheid_weighted_',weight_on ,'.png')
 plot.store <-paste0(plots.loc,plot.nme)
 ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, dpi=dpi)
-
 
 
 #crosstab incidentie beperking horen, zien of mobiliteit
@@ -593,7 +588,7 @@ ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, 
 
 
 
-#loopje
+#loopje uitwerken
 #scat = function(x_var) {
   
 #  ct_prop <- crosstab(ct$cl_kmeans, .data[[x_var]], weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
@@ -605,8 +600,6 @@ ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, 
  #}
 
 #scat(ct$GGEES208)
-
-
 
 
 #gest. hh inkomen in kwintielen ct$inkkwin_2016 or KwintielInk
@@ -653,13 +646,20 @@ huis <- crosstab(ct$cl_kmeans, ct$MMWSA210, weight = ct$case_wei,chisq = TRUE,ce
 home<- huis$prop.row*100
 home
 
-
 #vrijwilligerswerk
-vw <- crosstab(ct$cl_kmeans, ct$MMVWB201, weight = ct$case_wei,chisq = TRUE,cell.layout = TRUE,
-                 dnn = c("cluster", "Huisvrouw/-man"),
-                 expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
+vw <- crosstab(ct$cl_pam, ct$MMVWB201, weight = ct$case_wei,chisq = TRUE,cell.layout = TRUE,
+               dnn = c("cluster", "Vrijwilligerswerk"),
+               expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
 care<- vw$prop.row*100
 care
+
+#eenoudergezin
+op <- crosstab(ct$cl_pam, ct$AGHHS201, weight = ct$case_wei,chisq = TRUE,cell.layout = TRUE,
+               dnn = c("cluster", "Eenoudergezin"),
+               expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
+soloparent<- op$prop.row*100
+soloparent
+
 
 
 
@@ -732,7 +732,7 @@ sapply(sit, function(x) sum(is.na(x)))
 #method : Multivariate Imputation via Chained Equations, logreg(Logistic Regression) for binary variables
 
 #initial run to auto-determine powerful predictors for imputation
-ini <- mice(sit,pred=quickpred(sit, mincor=.3),seed=500, print=F)
+ini <- mice(sit,pred=quickpred(sit, mincor=.35),seed=500, print=F)
 #predictor matrix
 (pred <- ini$pred)
 
@@ -766,8 +766,6 @@ dimens_comp<-NULL
 
 dimens_comp<- principal(v[,-which(names(v)=="cl_kmeans")], nfactors = f, residuals = FALSE,rotate=rotation,n.obs=NA, covar=FALSE,
                         scores=TRUE,missing=TRUE,impute="median")
-
-#reset f based on the elbow 	
 
 plot.nme = paste0(ggd,'_pca_biplot_situational_cluster_',i,'.png')
 plot.store <-paste0(plots.loc,plot.nme)
