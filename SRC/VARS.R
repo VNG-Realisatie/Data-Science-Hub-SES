@@ -25,15 +25,15 @@
 #GGEEB207 : !Veel mensen om op te vertrouwen 
 #GGEEB208 : !Voldoende mensen waarmee verbondenheid is 
 
-#GGEEB210 : Voel me vaak in de steekgelaten EXIT
-#GGEEB211 : !Kan bij vrienden terecht wanneer behoefte is EXIT
+#GGEEB210 : Voel me vaak in de steekgelaten REMOVED
+#GGEEB211 : !Kan bij vrienden terecht wanneer behoefte is REMOVED
 
 #gezondheid en beperkingen
 #CALGA260 : Heeft langdurige ziekte(n) of aandoening(en) 
 #CALGA261 : Is (ernstig) beperkt in activiteiten vanwege gezondheid 
 #MMIKB201 : moeite met rondkomen 
 
-#LGBPS209 : Heeft minimaal een beperking met horen, zien of mobiliteit (ofwel minimaal grote moeite met 1 vd 7 OECD items) EXIT
+#LGBPS209 : Heeft minimaal een beperking met horen, zien of mobiliteit (ofwel minimaal grote moeite met 1 vd 7 OECD items) REMOVE
 #LGBPS203 : beperking horen
 #LGBPS204 : beperking zien
 #LGBPS205 : beperking mobiliteit
@@ -42,6 +42,7 @@
 #AGGWS205 : Obesitas, ofwel een BMI van 30 of hoger
 #LFALA213 : zware drinker
 #LFRKA205 : roker
+# beweegnorm / fitnorm ADD? 
 
 #angst en depressie
 #GGADB201 : Vaak vermoeid zonder duidelijke reden 
@@ -56,6 +57,10 @@
 #GGRLB204 : Ik voel me vaak hulpeloos bij omgaan problemen van het leven
 #GGRLB206 : Wat er in de toekomst met me gebeurt hangt voor grootste deel van mezelf af
 #MCMZOS304 : mantelzorg ontvangen
+
+#vitaliteit en veerkracht ADD?
+#levenstevredenheid en geluk ADD?
+
 
 #create new recoded variables
 #ervarengezondheid_dich 1 '(zeer) slecht' 0 'matig tot (zeer) goed)'

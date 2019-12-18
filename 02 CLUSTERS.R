@@ -2,12 +2,12 @@
 # Roadmap Positive Health
 # vulnerable citizens
 # script 2/4
-# scope : Kmeans cluster definition and -loading
+# scope : Kmediods (PAM) cluster definition and -loading
 # techniques : Principal component (PCA), aggregating, plotting
 # requirements: R Statistics version  (3.60=<)
-# author : Mark Henry Gremmen, in cooperation with Gemma Smulders (HvB), Ester de Jonge (ZHZ)
+# author : Mark Henry Gremmen, in cooperation with Gemma Smulders (GGD HvB), Ester de Jonge (GGD ZHZ)
 # DataScienceHub @ JADS, GGD Hart voor Brabant, GGD Zuid-Holland Zuid
-# lud 2019-11-22
+# lud 2019-12-18
 #-------------------------------------------------------------------------------
 
 #clear environment
@@ -37,8 +37,8 @@ root
 
 #GGD dep.
 #ggd <- 'HVB' #Hart voor Brabant
-#ggd <- 'ZHZ' #Zuid-Holland Zuid
-ggd <- 'UTR' #Utrecht
+ggd <- 'ZHZ' #Zuid-Holland Zuid
+#ggd <- 'UTR' #Utrecht
 
 #set graphs location
 plots.loc <- paste0(root,'/PLOTS/',ggd,'/')
@@ -53,7 +53,7 @@ options(digits=20)
 #number of clusters (Kmeans, Hierarchical Cluster Analysis) 
 #always (re)check the optimal number of clusters!!!
 #see DIMENSION.R section II. 'Optimal number of clusters'
-k <- 7
+k <- 8
 
 #number of factors (PCA)
 f <- 4
@@ -81,7 +81,7 @@ z <- FINAL_DF
 
 #clustering method results (as input)
 clustering <- "kmeans"
-#clus <- z$cl_kmeans
+#clus <- z$cl_pam
 
 #-------------------------------------------------------------------------------
 # WEIGHT
@@ -109,13 +109,13 @@ write.table(vulnerable, file = paste0(data.loc,"weigthed_vulnerable_distribution
 
 
 #Cluster membership distribution (weigthed) (pct)
-vulnerable_clus <- wpct(z$cl_kmeans, weight=wei_vec, na.rm=FALSE)*100
+vulnerable_clus <- wpct(z$cl_pam, weight=wei_vec, na.rm=FALSE)*100
 vulnerable_clus <- as.data.frame(vulnerable_clus)
 vulnerable_clus$vulnerable_clus <- round(vulnerable_clus$vulnerable_clus, digits=1) 
-vulnerable_clus$cl_kmeans <- as.numeric(row.names(vulnerable_clus))
+vulnerable_clus$cl_pam <- as.numeric(row.names(vulnerable_clus))
 
 plot.title = paste0('cluster ',clustering,' membership distribution (weighted=',weight_on ,')')
-cluster_dis <-  ggplot(vulnerable_clus, aes(x =factor(cl_kmeans),y=vulnerable_clus,fill=factor(cl_kmeans))) +
+cluster_dis <-  ggplot(vulnerable_clus, aes(x =factor(cl_pam),y=vulnerable_clus,fill=factor(cl_pam))) +
   ggtitle(plot.title) +
   theme_minimal() + 
   geom_text(aes(label=vulnerable_clus,color="#ababab"),vjust=-0.1) +
@@ -137,7 +137,7 @@ write.table(vulnerable_clus , file = paste0(data.loc,"weighted_vulnerable_distri
 #-------------------------------------------------------------------------------
 
 qs <- z 
-cols_report <- c("cl_kmeans", "case_wei", "GGEES203", "GGRLS202", "GGADS201", "LFT0109", "score_zw") 
+cols_report <- c("cl_pam", "case_wei", "GGEES203", "GGRLS202", "GGADS201", "LFT0109", "score_zw") 
 qs_s <- qs[,cols_report]
 
 qs_s[] <- lapply(qs_s, function(x) {
@@ -147,9 +147,9 @@ qs_s[] <- lapply(qs_s, function(x) {
 #weighted means of outcome * cluster
 
 a <- qs_s %>%
-  #subset(!is.na(cl_kmeans)) %>%
-  mutate(as.factor(cl_kmeans)) %>%
-  group_by(cl_kmeans) %>%
+  #subset(!is.na(cl_pam)) %>%
+  mutate(as.factor(cl_pam)) %>%
+  group_by(cl_pam) %>%
   summarise(
     leeftijd_w = weighted.mean(LFT0109, case_wei,na.rm = TRUE),
     samenloop_w = weighted.mean(score_zw, case_wei,na.rm = TRUE),
@@ -166,16 +166,18 @@ write.table(a , file = paste0(data.loc,"Weigthed_means_outcome_clusters_kmeans",
 
 #Cluster membership * municipality
 qg <- z
-cols_geo <- c("cl_kmeans", "case_wei", "Gemeentecode") 
+cols_geo <- c("cl_pam", "case_wei", "Gemeentecode") 
 qg_s <- qg[,cols_geo]
 
+
+
 gem <- qg_s %>%
-  subset(!is.na(cl_kmeans)) %>%
-  mutate(as.factor(cl_kmeans))
-gem
+  subset(!is.na(cl_pam)) %>%
+  mutate(as.factor(cl_pam))
+
 
 #crosstab incidentie clusters * gemeente
-ct_gemeente <- crosstab(gem$Gemeentecode, gem$cl_kmeans, weight = gem$case_wei,chisq = TRUE,cell.layout = TRUE,
+ct_gemeente <- crosstab(gem$Gemeentecode, gem$cl_pam, weight = gem$case_wei,chisq = TRUE,cell.layout = TRUE,
                            dnn = c("gemeente","cluster"),
                            expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE )
 
@@ -213,10 +215,10 @@ z$leeftijd <- as.numeric(z$LFT0109)
 
 
 plot.title = paste0('cluster ',clustering,' * leeftijd (weighted=',weight_on ,')')
-bp3 <- ggplot(z, aes(x = cl_kmeans, y = leeftijd, weight = case_wei,fill=cl_kmeans)) + 
+bp3 <- ggplot(z, aes(x = cl_pam, y = leeftijd, weight = case_wei,fill=cl_pam)) + 
   geom_boxplot(width=0.6,  colour = I("#3366FF")) + 
   #stat_summary(fun.y=mean, geom="point", shape=5, size=4) +
-  geom_point(data=a,aes(x=cl_kmeans,y=leeftijd_w),shape = 23, size = 3, fill ="red",inherit.aes=FALSE) +
+  geom_point(data=a,aes(x=cl_pam,y=leeftijd_w),shape = 23, size = 3, fill ="red",inherit.aes=FALSE) +
   theme_minimal() + 
   xlab("cluster") +
   ylab("Leeftijd") +
@@ -231,9 +233,9 @@ ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, 
 z$samenloop <- as.numeric(z$score_zw)
 
 plot.title = paste0('cluster ',clustering,' * samenloop (weighted=',weight_on ,')')
-bp4 <- ggplot(z, aes(x = cl_kmeans, y = samenloop, weight = case_wei, fill=cl_kmeans)) + 
+bp4 <- ggplot(z, aes(x = cl_pam, y = samenloop, weight = case_wei, fill=cl_pam)) + 
   geom_boxplot(width=0.6,  colour = I("#3366FF")) +
-  geom_point(data=a,aes(x=cl_kmeans,y=samenloop_w),shape = 23, size = 3, fill ="red",inherit.aes=FALSE) +
+  geom_point(data=a,aes(x=cl_pam,y=samenloop_w),shape = 23, size = 3, fill ="red",inherit.aes=FALSE) +
   theme_minimal() + 
   xlab("cluster") +
   ylab("Samenloop") +
@@ -248,9 +250,9 @@ ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, 
 z$GGADS201 <- as.numeric(z$GGADS201)
 
 plot.title = paste0('cluster ',clustering,' * angst en depressie (weighted=',weight_on ,')')
-bp5 <- ggplot(z, aes(x = cl_kmeans, y = GGADS201, weight = case_wei, fill=cl_kmeans)) + 
+bp5 <- ggplot(z, aes(x = cl_pam, y = GGADS201, weight = case_wei, fill=cl_pam)) + 
   geom_boxplot(width=0.6,  colour = I("#3366FF")) +
-  geom_point(data=a,aes(x=cl_kmeans,y=depri_w),shape = 23, size = 3, fill ="red",inherit.aes=FALSE) +
+  geom_point(data=a,aes(x=cl_pam,y=depri_w),shape = 23, size = 3, fill ="red",inherit.aes=FALSE) +
   theme_minimal() + 
   xlab("cluster") +
   ylab("Risico op angststoornis of depressie") +
@@ -266,9 +268,9 @@ ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, 
 z$GGRLS202 <- as.numeric(z$GGRLS202)
 
 plot.title = paste0('cluster ',clustering,' * regie op leven (weighted=',weight_on ,')')
-bp6 <- ggplot(z, aes(x = cl_kmeans, y = GGRLS202, weight = case_wei, fill=cl_kmeans)) + 
+bp6 <- ggplot(z, aes(x = cl_pam, y = GGRLS202, weight = case_wei, fill=cl_pam)) + 
   geom_boxplot(width=0.6,  colour = I("#3366FF")) +
-  geom_point(data=a,aes(x=cl_kmeans,y=regie_w),shape = 23, size = 3, fill ="red",inherit.aes=FALSE) +
+  geom_point(data=a,aes(x=cl_pam,y=regie_w),shape = 23, size = 3, fill ="red",inherit.aes=FALSE) +
   theme_minimal() + 
   xlab("cluster") +
   ylab("Regie op het leven") +
@@ -284,9 +286,9 @@ ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, 
 z$GGEES203 <- as.numeric(z$GGEES203)
 
 plot.title = paste0('cluster ',clustering,' * eenzaamheid (weighted=',weight_on ,')')
-bp7 <- ggplot(z, aes(x = cl_kmeans, y = GGEES203, weight = case_wei,fill=cl_kmeans)) + 
+bp7 <- ggplot(z, aes(x = cl_pam, y = GGEES203, weight = case_wei,fill=cl_pam)) + 
   geom_boxplot(width=0.6,  colour = I("#3366FF")) +
-  geom_point(data=a,aes(x=cl_kmeans,y=eenzaam_w),shape = 23, size = 3, fill ="red",inherit.aes=FALSE) +
+  geom_point(data=a,aes(x=cl_pam,y=eenzaam_w),shape = 23, size = 3, fill ="red",inherit.aes=FALSE) +
   theme_minimal() + 
   xlab("cluster") +
   ylab("Eenzaamheid") + 
@@ -306,10 +308,10 @@ ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, 
 
 
 ct <- z 
- # %>% subset(!is.na(cl_kmeans))
+ # %>% subset(!is.na(cl_pam))
 
 #crosstab incidentie eenzaamheid
-ct_prop <- crosstab(ct$cl_kmeans, ct$GGEES208, weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
+ct_prop <- crosstab(ct$cl_pam, ct$GGEES208, weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
                dnn = c("cluster", "lvl"),
                expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
 
@@ -332,7 +334,7 @@ ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, 
 
 
 #crosstab incidentie angst depressie
-ct_prop <- crosstab(ct$cl_kmeans, ct$GGADA202, weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
+ct_prop <- crosstab(ct$cl_pam, ct$GGADA202, weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
                     dnn = c("cluster", "lvl"),
                     expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
 
@@ -356,7 +358,7 @@ ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, 
 
 
 #crosstab incidentie regie op het leven
-ct_prop <- crosstab(ct$cl_kmeans, ct$GGRLS203, weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
+ct_prop <- crosstab(ct$cl_pam, ct$GGRLS203, weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
                     dnn = c("cluster", "lvl"),
                     expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
 
@@ -379,7 +381,7 @@ ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, 
 
 
 #crosstab incidentie ervaren gezondheid
-ct_prop <- crosstab(ct$cl_kmeans, ct$KLGGA207, weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
+ct_prop <- crosstab(ct$cl_pam, ct$KLGGA207, weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
                     dnn = c("cluster", "lvl"),
                     expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
 
@@ -402,7 +404,7 @@ ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, 
 
 
 #crosstab incidentie langdurige ziekte of -aandoening
-ct_prop <- crosstab(ct$cl_kmeans, ct$CALGA260, weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
+ct_prop <- crosstab(ct$cl_pam, ct$CALGA260, weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
                     dnn = c("cluster", "lvl"),
                     expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
 
@@ -426,7 +428,7 @@ ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, 
 
 
 #crosstab incidentie beperking gezondheid
-ct_prop <- crosstab(ct$cl_kmeans, ct$CALGA261, weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
+ct_prop <- crosstab(ct$cl_pam, ct$CALGA261, weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
                     dnn = c("cluster", "lvl"),
                     expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
 
@@ -449,7 +451,7 @@ ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, 
 
 
 #crosstab incidentie beperking horen, zien of mobiliteit
-ct_prop <- crosstab(ct$cl_kmeans, ct$LGBPS209, weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
+ct_prop <- crosstab(ct$cl_pam, ct$LGBPS209, weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
                     dnn = c("cluster", "lvl"),
                     expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
 
@@ -472,7 +474,7 @@ ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, 
 
 
 #crosstab incidentie beperking mobiliteit
-ct_prop <- crosstab(ct$cl_kmeans, ct$LGBPS205, weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
+ct_prop <- crosstab(ct$cl_pam, ct$LGBPS205, weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
                     dnn = c("cluster", "lvl"),
                     expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
 
@@ -496,7 +498,7 @@ ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, 
 
 
 #crosstab incidentie moeite rondkomen
-ct_prop <- crosstab(ct$cl_kmeans, ct$MMIKB201, weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
+ct_prop <- crosstab(ct$cl_pam, ct$MMIKB201, weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
                     dnn = c("cluster", "lvl"),
                     expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
 
@@ -519,7 +521,7 @@ ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, 
 
 
 #crosstab incidentie vermoeidheid
-ct_prop <- crosstab(ct$cl_kmeans, ct$GGADB201, weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
+ct_prop <- crosstab(ct$cl_pam, ct$GGADB201, weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
                     dnn = c("cluster", "lvl"),
                     expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
 
@@ -542,7 +544,7 @@ ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, 
 
 
 #crosstab incidentie mantelzorg ontvangen
-ct_prop <- crosstab(ct$cl_kmeans, ct$MCMZOS304, weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
+ct_prop <- crosstab(ct$cl_pam, ct$MCMZOS304, weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
                     dnn = c("cluster", "lvl"),
                     expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
 
@@ -565,7 +567,7 @@ ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, 
 
 
 #crosstab incidentie mantelzorger
-ct_prop <- crosstab(ct$cl_kmeans, ct$MCMZGS203, weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
+ct_prop <- crosstab(ct$cl_pam, ct$MCMZGS203, weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
                     dnn = c("cluster", "lvl"),
                     expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
 
@@ -591,7 +593,7 @@ ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, 
 #loopje uitwerken
 #scat = function(x_var) {
   
-#  ct_prop <- crosstab(ct$cl_kmeans, .data[[x_var]], weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
+#  ct_prop <- crosstab(ct$cl_pam, .data[[x_var]], weight = ct$case_wei, chisq = TRUE,cell.layout = TRUE,
  #                     dnn = c("cluster", "lvl"),
 #                      expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
   
@@ -604,7 +606,7 @@ ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, 
 
 #gest. hh inkomen in kwintielen ct$inkkwin_2016 or KwintielInk
 #lager is slechter
-ink <- crosstab(ct$cl_kmeans, ct$KwintielInk, weight = ct$case_wei,chisq = TRUE,cell.layout = TRUE,
+ink <- crosstab(ct$cl_pam, ct$KwintielInk, weight = ct$case_wei,chisq = TRUE,cell.layout = TRUE,
                   dnn = c("cluster", "Inkomen huishouden"),
                   expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
 income<- ink$prop.row*100
@@ -612,7 +614,7 @@ income
 
 
 #werkloos en werkzoekend
-wkl <- crosstab(ct$cl_kmeans, ct$MMWSA207, weight = ct$case_wei,chisq = TRUE,cell.layout = TRUE,
+wkl <- crosstab(ct$cl_pam, ct$MMWSA207, weight = ct$case_wei,chisq = TRUE,cell.layout = TRUE,
                dnn = c("cluster", "Werkloos en werkzoekend"),
                expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
 
@@ -621,7 +623,7 @@ unemployed
 
 
 #opleiding
-opl <- crosstab(ct$cl_kmeans, ct$Opleiding_samind, weight = ct$case_wei,chisq = TRUE,cell.layout = TRUE,
+opl <- crosstab(ct$cl_pam, ct$Opleiding_samind, weight = ct$case_wei,chisq = TRUE,cell.layout = TRUE,
                 dnn = c("cluster", "Opleiding"),
                 expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
 
@@ -631,7 +633,7 @@ education
 
 
 #pensioen
-pen <- crosstab(ct$cl_kmeans, ct$MMWSA206, weight = ct$case_wei,chisq = TRUE,cell.layout = TRUE,
+pen <- crosstab(ct$cl_pam, ct$MMWSA206, weight = ct$case_wei,chisq = TRUE,cell.layout = TRUE,
                 dnn = c("cluster", "Pensioen"),
                 expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
 pensionado<- pen$prop.row*100
@@ -640,7 +642,7 @@ pensionado
 
 
 #huisvrouw/-man
-huis <- crosstab(ct$cl_kmeans, ct$MMWSA210, weight = ct$case_wei,chisq = TRUE,cell.layout = TRUE,
+huis <- crosstab(ct$cl_pam, ct$MMWSA210, weight = ct$case_wei,chisq = TRUE,cell.layout = TRUE,
                 dnn = c("cluster", "Huisvrouw/-man"),
                 expected = FALSE, prop.c = FALSE, prop.r = TRUE, plot=FALSE,row.labels =TRUE,total.c = FALSE,total.r = FALSE)
 home<- huis$prop.row*100
@@ -667,7 +669,7 @@ soloparent
 #Correlation matrix
 
 #change first variable name to target the desirec cluster. e.g. cluster 2 is 'clus2'
-#dim_var <- c("clus1","cl_kmeans","leeftijd70eo","gez_slecht","inkomenlaag_dich", "dagactiviteit","geenbetaaldwerk","opl_lm", "ziek_lt",
+#dim_var <- c("clus1","cl_pam","leeftijd70eo","gez_slecht","inkomenlaag_dich", "dagactiviteit","geenbetaaldwerk","opl_lm", "ziek_lt",
 #             "depri_hg", "MCMZOS305","CALGA260", "CALGA261","LGBPS209") 
 
 #cl <- FINAL_DF[, dim_var]
@@ -677,8 +679,8 @@ soloparent
 #})
 #sapply(cl, class)
 
-#cl <- subset(cl1,cl_kmeans>0)
-#cl$cl_kmeans <- NULL
+#cl <- subset(cl1,cl_pam>0)
+#cl$cl_pam <- NULL
 #cor_cl <- cor(cl, method = "pearson", use = "complete.obs")
 #cor_cl
 
@@ -707,7 +709,7 @@ soloparent
 #vrijwilligerswerk_dich : verricht vrijwilligerswerk
 #vriendenkring_dich: vriendenkring is beperkt
 
-dim_var <- c("cl_kmeans","leeftijd70eo","ervarengezondheid_dich","inkomenlaag_dich", "werkopleiding_dich", "vrijwilligerswerk_dich",
+dim_var <- c("cl_pam","leeftijd70eo","ervarengezondheid_dich","inkomenlaag_dich", "werkopleiding_dich", "vrijwilligerswerk_dich",
              "opl_lm", "ziek_lt", "mantelzorg_dich", "MCMZOS304_dich", "vriendenkring_dich") 
 
 #relevant variables for PCA
@@ -721,7 +723,7 @@ sit[] <- lapply(sit, function(x) {
 sit[sit == 9] <- NA
 
 #cluster member in kmeans method
-sit <- sit[ which(sit$cl_kmeans>0), ]
+sit <- sit[ which(sit$cl_pam>0), ]
 
 
 sapply(sit, function(x) sum(is.na(x)))
@@ -760,11 +762,11 @@ for(i in 1:k) {
 #manual cluster number 
 #i <- 1
 #filter by cluster number  
-v <-subset(sit,cl_kmeans==i)
+v <-subset(sit,cl_pam==i)
 
 dimens_comp<-NULL
 
-dimens_comp<- principal(v[,-which(names(v)=="cl_kmeans")], nfactors = f, residuals = FALSE,rotate=rotation,n.obs=NA, covar=FALSE,
+dimens_comp<- principal(v[,-which(names(v)=="cl_pam")], nfactors = f, residuals = FALSE,rotate=rotation,n.obs=NA, covar=FALSE,
                         scores=TRUE,missing=TRUE,impute="median")
 
 plot.nme = paste0(ggd,'_pca_biplot_situational_cluster_',i,'.png')

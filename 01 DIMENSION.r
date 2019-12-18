@@ -6,9 +6,9 @@
 # tecniques: imputation (IM), outlier analysis (OU), dimensional reduction (DR), clustering (CL), 
 # approach: unsupervised
 # requirements: R Statistics version  (3.60=<)
-# author : Mark Henry Gremmen, in cooperation with Gemma Smulders (HvB), Ester de Jonge (ZHZ)
+# author : Mark Henry Gremmen, in cooperation with Gemma Smulders (GGD HvB), Ester de Jonge (GGD ZHZ)
 # DataScienceHub @ JADS, GGD Hart voor Brabant, GGD Zuid-Holland Zuid
-# lud 2019-11-22
+# lud 2019-12-18
 #------------------------------------------------------------------------------
 
 #clear environment
@@ -60,7 +60,7 @@ lapply(locations, function(x) {
 
 #config
 set.seed(123)  # for reproducibility
-options(digits=20)
+options(digits=15)
 
 #respondent id = "volgnummer"
 
@@ -173,8 +173,8 @@ save(SOURCE_RAW,file=paste0(data.loc,"SOURCE_RAW",".Rda"))
 #GGEEB207 : !Veel mensen om op te vertrouwen 
 #GGEEB208 : !Voldoende mensen waarmee verbondenheid is 
 
-#GGEEB210 : Voel me vaak in de steekgelaten REMOVE
-#GGEEB211 : !Kan bij vrienden terecht wanneer behoefte is REMOVE
+#GGEEB210 : Voel me vaak in de steekgelaten REMOVED
+#GGEEB211 : !Kan bij vrienden terecht wanneer behoefte is REMOVED
 
 #gezondheid en beperkingen
 #CALGA260 : Heeft langdurige ziekte(n) of aandoening(en) 
@@ -190,7 +190,7 @@ save(SOURCE_RAW,file=paste0(data.loc,"SOURCE_RAW",".Rda"))
 #AGGWS205 : Obesitas, ofwel een BMI van 30 of hoger
 #LFALA213 : zware drinker
 #LFRKA205 : roker
-# beweegnorm / fitnorm ADD 
+# beweegnorm / fitnorm ADD? 
 
 #angst en depressie
 #GGADB201 : Vaak vermoeid zonder duidelijke reden 
@@ -205,6 +205,9 @@ save(SOURCE_RAW,file=paste0(data.loc,"SOURCE_RAW",".Rda"))
 #GGRLB204 : Ik voel me vaak hulpeloos bij omgaan problemen van het leven
 #GGRLB206 : Wat er in de toekomst met me gebeurt hangt voor grootste deel van mezelf af
 #MCMZOS304 : mantelzorg ontvangen
+
+#vitaliteit en veerkracht ADD?
+#levenstevredenheid en geluk ADD?
 
 #variable manipulation (see directory SRC > VARS.R)
 source(src.dir)
@@ -268,7 +271,6 @@ bin_outcome <- SOURCE_SUBSET %>%
          reg_bin = binning(SOURCE_SUBSET$GGRLS202_dich)
   )
 
-
 #regie en samenloop
 plot.title = paste0('Gebrek aan regie * samenloop')
 bp1 <- ggplot(bin_outcome, aes(y = GGRLS202_dich, x = zw_bin, fill=zw_bin)) + 
@@ -283,7 +285,6 @@ bp1
 plot.nme = paste0(ggd,'_explore_regie_samenloop.png')
 plot.store <-paste0(plots.loc,plot.nme)
 ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, dpi=dpi)
-
 
 #samenloop en gebrek aan regie
 plot.title = paste0('Samenloop * gebrek aan regie')
@@ -669,6 +670,12 @@ ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio,d
 #we cluster the focal group cases and plot the outliers as 0
 #later we associate outliers to it's position to the dominant cluster
 
+#the trick is to accommodate as much outliers as possible untill the point that it gets too
+#difficult for Kmeans to converge: adjust outlier threshold accordingly !!
+#the group of outliers that cannot be associated with a K-means cluster may need special attention
+#in policy and intervention efforts.
+#especially when outliers are near (or 'in') multi-problem or highly vulnerable clusters 
+
 #working tsne for kmeans (focus group)
 tsne_km <- tsne_foc
 
@@ -822,10 +829,6 @@ silwidth <- rbind(silwidth_kmeans,silwidth_pam,silwidth_hca)
 silwidth <- as.data.frame(silwidth)
 silwidth
 
-#hdbscan
-#cs3 = cluster.stats(dist(ANALYSIS_SUBSET),as.numeric(tsne_original$cl_hdbscan))
-#cs3[c("within.cluster.ss","avg.silwidth")]
-
 silwidth$within.cluster.ss <- as.numeric(silwidth$within.cluster.ss) 
 silwidth$methods <- row.names(silwidth)
 silwidth$methods <- as.factor(silwidth$methods)  
@@ -839,6 +842,20 @@ cluster_ss <- ggplot(silwidth, aes(x=methods, y = within.cluster.ss)) +
   geom_boxplot() 
 cluster_ss
 ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio,dpi = dpi)
+
+
+
+#clusterassignaties vergelijken Fowlkes-Mallows
+#cl_kmeans versus cl_pam
+rep <- 10000
+FM_index_H0 <- replicate(rep, FM_index_permutation(tsne_store$cl_pam, tsne_store$cl_kmeans)) 
+plot(density(FM_index_H0), main = "FM Index distribution under H0\n (10000 permutation)")
+abline(v = mean(FM_index_H0), col = 1, lty = 2)
+
+skew(FM_index_H0) 
+kurtosi(FM_index_H0)
+
+
 
 
 #-------------------------------------------------------------------------------

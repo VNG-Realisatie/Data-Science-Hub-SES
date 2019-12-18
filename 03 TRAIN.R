@@ -3,9 +3,9 @@
 # vulnerable citizens
 # script 3/4
 # Train model
-# author : Mark Henry Gremmen, in cooperation with Gemma Smulders
-# DataScienceHub @ JADS, GGD Hart voor Brabant
-# lud 2019-11-08
+# author : Mark Henry Gremmen, in cooperation with Gemma Smulders (GGD HvB), Ester de Jonge (GGD ZHZ)
+# DataScienceHub @ JADS, GGD Hart voor Brabant, GGD Zuid-Holland Zuid
+# lud 2019-12-18
 #-------------------------------------------------------------------------------
 
 #clear environment
@@ -53,20 +53,20 @@ SOURCE <- read.csv(source.file, T, ",")
 str(SOURCE)
 
 #set cluster membership of non-vulnerbale observations to zero 
-SOURCE$cl_kmeans[is.na(SOURCE$cl_kmeans)] <- 0
+SOURCE$cl_pam[is.na(SOURCE$cl_pam)] <- 0
 
 head(SOURCE)
 
-#original variables (not recoded, different likert scales) from the GGD Gezondheidsmonitor incl cluster membership cl_kmeans. 
+#original variables (not recoded, different likert scales) from the GGD Gezondheidsmonitor incl cluster membership cl_pam. 
 #cluster membership must reside at the last position if the list 
 #cols <- c("GGADS201","KLGGB201","MMIKB201","CALGA260","CALGA261","LGBPS205","GGEEB201","GGEEB203",
 #          "GGEEB204","GGEEB207","GGEEB208","GGRLB201","GGRLB202","GGRLB204","GGRLB206","GGADB201",
-#          "GGADB202","GGADB204","GGADB207","GGADB210","cl_kmeans") 
+#          "GGADB202","GGADB204","GGADB207","GGADB210","cl_pam") 
 
 cols <- c("GGEES203","GGRLS202","GGADS201","KLGGA207", # <- outcome level
           "MMIKB201","CALGA260","CALGA261","LGBPS209","AGGWS205","GGEEB201","GGEEB203","GGEEB204","GGEEB207",
           "GGEEB208","GGRLB201","GGRLB202","GGRLB204","GGRLB206","GGADB201","GGADB202","GGADB204",
-          "GGADB207","GGADB210","GGEEB210","GGEEB211", "MCMZOS304","cl_kmeans") 
+          "GGADB207","GGADB210","GGEEB210","GGEEB211", "MCMZOS304","cl_pam") 
 
 SOURCE_SUBSET <- subset(SOURCE_ENRICHED, select = cols)
 
@@ -77,7 +77,7 @@ dim(SOURCE_SUBSET)
 df_tr <- ncol(SOURCE_SUBSET)
 df_tr
 
-#use only complete records (with cl_kmeans membership) for modelling
+#use only complete records (with cl_pam membership) for modelling
 data <- na.omit(SOURCE_SUBSET)
 
 # spliting the data into train and test
@@ -120,7 +120,7 @@ pca.train <- as.data.frame(pca.train)
 
 # adding our target variable which was not included during the PCA training
 # NSP is cluster membership
-pca.train <- cbind(pca.train, NSP= train[,"cl_kmeans"])
+pca.train <- cbind(pca.train, NSP= train[,"cl_pam"])
 
 #table(observed=, predicted=)
 
@@ -128,7 +128,7 @@ pca.train <- cbind(pca.train, NSP= train[,"cl_kmeans"])
 pca.test <- predict(pca, test)
 pca.test <- as.data.frame(pca.test)
 
-pca.test <- cbind(pca.test, NSP= test[,"cl_kmeans"])
+pca.test <- cbind(pca.test, NSP= test[,"cl_pam"])
 
 #model with multinomial logistic regression
 
