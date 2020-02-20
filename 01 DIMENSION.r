@@ -8,7 +8,7 @@
 # requirements: R Statistics version  (3.60=<)
 # author : Mark Henry Gremmen, in cooperation with Gemma Smulders (GGD HvB), Ester de Jonge (GGD ZHZ)
 # DataScienceHub @ JADS, GGD Hart voor Brabant, GGD Zuid-Holland Zuid
-# lud 2019-12-18
+# lud 2020-02-04
 #------------------------------------------------------------------------------
 
 #clear environment
@@ -41,14 +41,14 @@ root
 ggd <- 'ZHZ' #Zuid-Holland Zuid
 #ggd <- 'UTR' #Utrecht
 
-#source varariables manipulation location
+#source location feature-preparation
 src.dir <- paste0(root,'/SRC/VARS.R')
 
-#set graphs location
+#set location graphs
 plots.dir <- paste0(root,'/PLOTS/')
 plots.loc <- paste0(root,'/PLOTS/',ggd,'/')
 
-#set data location 
+#set location data
 data.dir <- paste0(root,'/DATA/')
 data.loc <- paste0(root,'/DATA/',ggd,'/')
 
@@ -209,7 +209,7 @@ save(SOURCE_RAW,file=paste0(data.loc,"SOURCE_RAW",".Rda"))
 #vitaliteit en veerkracht ADD?
 #levenstevredenheid en geluk ADD?
 
-#variable manipulation (see directory SRC > VARS.R)
+#variable preparation (see directory SRC > VARS.R)
 source(src.dir)
 
 SOURCE_ENRICHED <- SOURCE_RAW
@@ -224,6 +224,7 @@ save(SOURCE_ENRICHED,file=paste0(data.loc,"SOURCE_ENRICHED",".Rda"))
 # Filtering
 
 SOURCE_SUBSET <- SOURCE_ENRICHED
+
 #municipality filter
 #SOURCE_SUBSET <- SOURCE_ENRICHED[SOURCE_ENRICHED$Gemeentecode>1,]
 
@@ -240,7 +241,7 @@ cols <- c("GGEES203","GGRLS202","GGADS201","KLGGA207", # <- outcome level
           # perception in outcome features -> 
           #eenzaamheid
           "GGEEB201_dich","GGEEB203_dich","GGEEB204_dich","GGEEB207_dich","GGEEB208_dich",
-          #"GGEEB210", "GGEEB211" # in de tseek gelaten, kan bij vrienden terecht
+          #"GGEEB210", "GGEEB211" # in de steek gelaten, kan bij vrienden terecht
           #gezondheid en beperkingen
           "CALGA260","CALGA261","LGBPS209","MMIKB201_dich",
           #angst en depressie
@@ -331,7 +332,7 @@ SOURCE_SUBSET <- SOURCE_SUBSET[ which(SOURCE_SUBSET$GGEES203_dich>8 #eenzaamheid
                                       | SOURCE_SUBSET$score_zw>4) #samenloop
                                 , ]
 
-#remove outcome variables, keep relevant variables for the fingerprint
+#remove outcome variables, keep relevant features for the fingerprint
 SOURCE_SUBSET <- subset(SOURCE_SUBSET, select = -c(GGEES203_dich,GGRLS202_dich,GGADS201_dich,KLGGA207_dich,score_zw))
 
 #number of dichotomous features (df)
@@ -392,6 +393,7 @@ ini <- mice(SOURCE_SUBSET,pred=quickpred(SOURCE_SUBSET, mincor=.35),seed=500, pr
 
 save(pred, file = "prediction_matrix_features.RData")
 
+#or just load a predefined prediction matrix
 #pred <- load("prediction_matrix_features.RData")
 
 #first run (low number of iterations)
@@ -400,7 +402,7 @@ imp_data <- mice(SOURCE_SUBSET,method = "logreg", pred=pred,m=5,maxit=10,seed=50
 summary(imp_data)
 
 #convergence
-#it is important that convergence is taking effect towards the end of the iteration process
+#it is important that convergence takes effect towards the end of the iteration process
 
 plot.nme = paste0(ggd,'_convergence_imputation_iterations_first_run.png')
 plot.store <-paste0(plots.loc,plot.nme)
@@ -720,10 +722,6 @@ ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio,d
 
 km_cl <- merge(tsne_store, tsne_km, by=0, all.x=T, keep=F)
 row.names(km_cl) <- km_cl[,1]
-#km_cl <- km_cl[,c(2,3,6)]
-
-#names(km_cl)[names(km_cl) == 'V1.x'] <- 'V1'
-#names(km_cl)[names(km_cl) == 'V2.x'] <- 'V2'
 
 #add clustermemberschip to Tsne dataframe
 tsne_store$cl_kmeans <- km_cl$cl_kmeans 
@@ -843,18 +841,15 @@ cluster_ss <- ggplot(silwidth, aes(x=methods, y = within.cluster.ss)) +
 cluster_ss
 ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio,dpi = dpi)
 
-
-
-#clusterassignaties vergelijken Fowlkes-Mallows
+#evaluation of the similarity between two clusterings
 #cl_kmeans versus cl_pam
 rep <- 10000
 FM_index_H0 <- replicate(rep, FM_index_permutation(tsne_store$cl_pam, tsne_store$cl_kmeans)) 
-plot(density(FM_index_H0), main = "FM Index distribution under H0\n (10000 permutation)")
+plot(density(FM_index_H0), main = "FM Index distribution under H0\n (10000 permutation), PAM vs Kmeans")
 abline(v = mean(FM_index_H0), col = 1, lty = 2)
 
 skew(FM_index_H0) 
 kurtosi(FM_index_H0)
-
 
 
 
@@ -877,7 +872,7 @@ y <- merge(SOURCE_ENRICHED, tsne_store,all=T, by='volgnummer')
 z <- merge(y,ZW,all=T, by='volgnummer')
 rm(y)
 
-#dichotomize clustermembership Kmeans per clusters 
+#dichotomize clustermembership Kmeans per clusters into new variables
 for (cluster in 1:k){
   col = sprintf("kmeans_clus%d", cluster)
   z[col] = as.integer(as.logical(z$cl_kmeans == cluster))
@@ -905,4 +900,3 @@ write_sav(z, final_sav)
 FINAL_DF <- z
 
 save(FINAL_DF,file=paste0(data.loc,"FINAL_DF",".Rda"))
-

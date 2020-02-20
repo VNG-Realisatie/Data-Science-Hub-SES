@@ -7,7 +7,7 @@
 # requirements: R Statistics version  (3.60=<)
 # author : Mark Henry Gremmen, in cooperation with Gemma Smulders (GGD HvB), Ester de Jonge (GGD ZHZ)
 # DataScienceHub @ JADS, GGD Hart voor Brabant, GGD Zuid-Holland Zuid
-# lud 2019-12-18
+# lud 2020-02-20
 #-------------------------------------------------------------------------------
 
 #clear environment
@@ -59,8 +59,9 @@ k <- 8
 f <- 4
 
 #rotation (PCA)
-#distinct dimensions
-rotation <- "varimax"
+#Varimax returns factors that are orthogonal; Oblimin allows the factors to not be orthogonal.
+#rotation <- "varimax" #uncorrelated independent variables
+rotation <- "oblimin" #correlated independent variables
 
 #dimension plots
 graph_height <- 9
