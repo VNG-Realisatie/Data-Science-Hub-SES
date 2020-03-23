@@ -5,10 +5,11 @@
 # scope : dimension reduction and clustering
 # tecniques: imputation (IM), outlier analysis (OU), dimensional reduction (DR), clustering (CL), 
 # approach: unsupervised
-# requirements: R Statistics version  (3.60=<)
-# author : Mark Henry Gremmen, in cooperation with Gemma Smulders (GGD HvB), Ester de Jonge (GGD ZHZ)
+# requirements: R Statistics version  (3.62=<)
+# author : Mark Henry Gremmen (VNG/Data Science Hub), 
+# in cooperation with Gemma Smulders (GGD HvB), Ester de Jonge (GGD ZHZ)
 # DataScienceHub @ JADS, GGD Hart voor Brabant, GGD Zuid-Holland Zuid
-# lud 2020-02-04
+# lud 2020-03-23
 #------------------------------------------------------------------------------
 
 #clear environment
@@ -17,24 +18,31 @@ rm(list=ls())
 #clear console
 cat("\014")  
 
+#containerized packages
+#if (!require("devtools")) install.packages("devtools")
+devtools::install_github("rstudio/packrat")
+packrat::init()
+
 #packages
-packages <- c("devtools","tools","here","tidyverse","naniar", "haven", "stats", "mice","VIM", "corrplot", "car", "nFactors", "psych", "caret", 
-              "Rtsne", "cluster","dbscan", "dendextend", "fpc", "factoextra", "rpart", "rpart.plot", "weights", "RColorBrewer","skimr", "corrplot",  
-              "ggplot2", "ggthemes", "qgraph", "gridExtra","randomForest","tidyr","dlookr", "aod", "janitor", "descr", "forcats", "sqldf")
+#devtools::install_github("ropenscilabs/umapr")
+#library("umapr")
+
+packages <- c("tools","here","tidyverse","naniar", "haven", "stats", "mice","VIM", "corrplot", "car", "nFactors", "psych", "caret", 
+              "Rtsne", "umap", "cluster","dbscan", "dendextend", "fpc", "factoextra", "rpart", "rpart.plot", "weights", "RColorBrewer","skimr", "corrplot",  
+              "ggplot2", "ggthemes", "qgraph", "gridExtra","randomForest","tidyr","dlookr", "aod", "janitor", "descr", "forcats", "sqldf","broom")
 #install packages which are not available on the computing setup
 has_available   <- packages %in% rownames(installed.packages())
 if(any(!has_available)) install.packages(packages[!has_available])
 
 lapply(packages,library,character.only = TRUE,quietly = TRUE)
-#review packages loaded
+#review packages loaded (important!)
 sessionInfo()
 
 #-------------------------------------------------------------------------------
 # Global settings
 
 #root location of this procedure (working directory)
-root <- getwd()
-root
+(root <- getwd())
 
 #GGD dep.
 #ggd <- 'HVB' #Hart voor Brabant
@@ -64,19 +72,21 @@ options(digits=15)
 
 #respondent id = "volgnummer"
 
-#number of clusters (Kmeans, Hierarchical Cluster Analysis) 
+#number of clusters for partitioning methods (K-means, PAM)
 #always (re)check the optimal number of clusters
 #see DIMENSION.R section II. 'Optimal number of clusters'
 #determine the optimal number of clusters first before running the entire script
 #run the script to the point (including) section II first
 #the Silhoutte or GAP plot will indicate the optimal number of clusters
 #adjust 'k' accordingly below. 
-k <- 8
+#please note that there can be good reasons to choose a slightly different number
+#clustering is a explorative technique. You must not assume there is a single "true" clustering
+k <- 9
 
 #perplexity (Tsne)
 #In Tsne, the perplexity may be viewed as a knob that sets the number of 
-#effective nearest neighbors. It is comparable with the number of nearest neighbors k 
-#value between 30 and 50 is usually fine
+#effective nearest neighbors. A value between 30 and 50 is usually fine
+#more info: https://distill.pub/2016/misread-tsne/
 perplex <- 35
 
 #dimension and quality plots
@@ -95,6 +105,8 @@ dest.nme.var <- paste0("kwetsbaar", "_",ggd)
 
 #-------------------------------------------------------------------------------
 # LOAD DATA 
+
+#-------------------------------------------------------------------------------
 # 3 options:
 
 #1. load Spss dataset from location DATA
@@ -117,27 +129,26 @@ SOURCE_RAW <- read_spss(srce.loc)
 
 #head(SOURCE_RAW,2)
 #str(SOURCE_RAW)
+dim(SOURCE_RAW)
 skim(SOURCE_RAW)
 
-#load TFI Spss dataset from location DATA (ZHZ only)
+#load TFI Spss dataset from location DATA (GGD ZHZ only)
 #tfi.loc <- paste0(data.loc,"TFI.sav")
 #TFI <- read_spss(tfi.loc)
-
-dim(SOURCE_RAW)
 
 #-------------------------------------------------------------------------------
 # IDENTIFIER 
 
 #unique identifiers?
-sqldf("SELECT count(distinct(volgnummer)) FROM SOURCE_RAW")
+#sqldf("SELECT count(distinct(volgnummer)) FROM SOURCE_RAW")
 
 #define respondent id
 SOURCE_RAW$respondent_id <- as.character(SOURCE_RAW$volgnummer) 
 
 #attach respondent id to index of dataframe
 SOURCE_RAW$respondent_id <- paste0("x",SOURCE_RAW$respondent_id)
-has_rownames(SOURCE_RAW)
-SOURCE_RAW <- remove_rownames(SOURCE_RAW)
+if (has_rownames(SOURCE_RAW)) {SOURCE_RAW <- remove_rownames(SOURCE_RAW)}
+
 SOURCE_RAW <- column_to_rownames(SOURCE_RAW, var = "respondent_id")
 
 #re-set respondent_id
@@ -150,7 +161,9 @@ save(SOURCE_RAW,file=paste0(data.loc,"SOURCE_RAW",".Rda"))
 #-------------------------------------------------------------------------------
 #DATA PREPARATION
 
-#HIGH-ORDER OUTCOME VARIABLES (as proxy for vulnerability) : inclusion criteria
+#-------------------------------------------------------------------------------
+
+#HIGH-ORDER 'OUTCOME' VARIABLES (as proxy for vulnerability) : inclusion criteria
 #
 #GGEES203 : (zeer) ernstig eenzaam (dichotoom)
 #GGRLS202 : onvoldoende regie over eigen leven (dichotoom)
@@ -213,8 +226,6 @@ save(SOURCE_RAW,file=paste0(data.loc,"SOURCE_RAW",".Rda"))
 source(src.dir)
 
 SOURCE_ENRICHED <- SOURCE_RAW
-
-#remove source raw file
 rm(SOURCE_RAW)
 
 save(SOURCE_ENRICHED,file=paste0(data.loc,"SOURCE_ENRICHED",".Rda"))
@@ -223,6 +234,7 @@ save(SOURCE_ENRICHED,file=paste0(data.loc,"SOURCE_ENRICHED",".Rda"))
 #-------------------------------------------------------------------------------
 # Filtering
 
+#no filtering
 SOURCE_SUBSET <- SOURCE_ENRICHED
 
 #municipality filter
@@ -232,12 +244,12 @@ SOURCE_SUBSET <- SOURCE_ENRICHED
 #-------------------------------------------------------------------------------
 # Subsetting
 
-#features : first four are higher-order outcome dimensions
+#features : first line contains higher-order 'outcome' dimensions
 #if you add features, please do so add the end of the list
 #only add dichotomized features (which indicicate experienced issues/vulnerability, vitality or resilience)
 
 cols <- c("GGEES203","GGRLS202","GGADS201","KLGGA207", # <- outcome level
-          "werkopleiding_dich", "vrijwilligerswerk_dich", "mantelzorg_dich", # <- zinvol bestaan
+          "werkopleiding_dich", "vrijwilligerswerk_dich", "mantelzorg_dich", # <- zinvol dagbesteding
           # perception in outcome features -> 
           #eenzaamheid
           "GGEEB201_dich","GGEEB203_dich","GGEEB204_dich","GGEEB207_dich","GGEEB208_dich",
@@ -247,13 +259,14 @@ cols <- c("GGEES203","GGRLS202","GGADS201","KLGGA207", # <- outcome level
           #angst en depressie
           "GGRLB201_dich","GGRLB202_dich","GGRLB204_dich","GGADB207_dich","GGADB210_dich",
           #regie op het leven
-          "GGADB201_dich","GGADB202_dich","GGADB204_dich","GGRLB206_dich", "MCMZOS304", 
+          "GGADB201_dich","GGADB202_dich","GGADB204_dich","GGRLB206_dich", "MCMZOS304" 
           #lifestyle/gedrag
-          "LFALA213", "LFRKA205", "AGGWS205")
+          #,"LFALA213", "LFRKA205", "AGGWS205"
+          )
           
 SOURCE_SUBSET <- subset(SOURCE_SUBSET, select = cols)
 
-#append '_dich' to variable name of the remaining variables not containing '_dich'
+#append '_dich' to variable name of the remaining variables not already recoded and containing '_dich' to prevent contamination
 colnames(SOURCE_SUBSET) <- sub("^(?!.*_dich)(.*)", "\\1_dich", colnames(SOURCE_SUBSET), perl=TRUE)
 
 #proxy for level of issues: 'hoge samenloop / multi-problematiek' start column range after outcome level and zinvol bestaan indicators
@@ -263,8 +276,7 @@ score_zw <- SOURCE_SUBSET %>%
 score_zw <- score_zw[,c("score_zw")]
 SOURCE_SUBSET <- cbind(SOURCE_SUBSET,score_zw)
 
-
-#determine base level of 'samenloop' (score_sw) and 'angst en depressie' (GGADS201_dich) by (natural) binning
+#determine critical level of 'samenloop' (score_sw) and 'angst en depressie' (GGADS201_dich) by (natural) binning
 #based on population
 bin_outcome <- SOURCE_SUBSET %>%
   mutate(zw_bin = binning(SOURCE_SUBSET$score_zw),
@@ -276,7 +288,7 @@ bin_outcome <- SOURCE_SUBSET %>%
 plot.title = paste0('Gebrek aan regie * samenloop')
 bp1 <- ggplot(bin_outcome, aes(y = GGRLS202_dich, x = zw_bin, fill=zw_bin)) + 
   geom_boxplot(width=0.6,  colour = I("#3366FF")) +
-  # geom_point(data=a,aes(x=cl_kmeans,y=samenloop_w),shape = 23, size = 3, fill ="red",inherit.aes=FALSE) +
+ #geom_jitter(aes(color='observations'),alpha=0.02) +
   theme_minimal() +
   xlab("level of samenloop") +
   ylab("gebrek aan regie") +
@@ -287,11 +299,11 @@ plot.nme = paste0(ggd,'_explore_regie_samenloop.png')
 plot.store <-paste0(plots.loc,plot.nme)
 ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio, dpi=dpi)
 
-#samenloop en gebrek aan regie
+#samenloop en regie
 plot.title = paste0('Samenloop * gebrek aan regie')
 bp2 <- ggplot(bin_outcome, aes(x = reg_bin, y = score_zw, fill=reg_bin)) + 
   geom_boxplot(width=0.6,  colour = I("#3366FF")) +
-  # geom_point(data=a,aes(x=cl_kmeans,y=samenloop_w),shape = 23, size = 3, fill ="red",inherit.aes=FALSE) +
+  #geom_jitter(aes(color='observations'),alpha=0.02) +
   theme_minimal() + 
   ylab("level of samenloop") +
   xlab("level of gebrek aan regie") +
@@ -306,7 +318,7 @@ ggsave(plot.store, height = graph_height, width = graph_height * aspect_ratio, d
 plot.title = paste0('Samenloop * angst en depressie')
 bp3 <- ggplot(bin_outcome, aes(x = dep_bin, y = score_zw, fill=dep_bin)) + 
   geom_boxplot(width=0.6,  colour = I("#3366FF")) +
-  # geom_point(data=a,aes(x=cl_kmeans,y=samenloop_w),shape = 23, size = 3, fill ="red",inherit.aes=FALSE) +
+  #geom_jitter(aes(color='observations'),alpha=0.05) +
   theme_minimal() + 
   ylab("level of samenloop") +
   xlab("level of angst en depressie") +
@@ -318,12 +330,13 @@ plot.store <-paste0(plots.loc,plot.nme)
 ggsave(plot.store, height = graph_height, width = graph_height * aspect_ratio, dpi=dpi)
 
 
+#-------------------------------------------------------------------------------
 #inclusion criteria
+
 #kwetsbare of (dreigende) zorgwekkende gevallen op het vlak van 
 #eenzaamheid en / of gebrek regie op het leven, en / of angststoornis/depressie en / of
 #ervaren gezondheid en / of hoge samenloop van problematiek
 #adjust threshold gebrek aan regie en samenloop based on binning and boxplot results (see above)
-
 
 SOURCE_SUBSET <- SOURCE_SUBSET[ which(SOURCE_SUBSET$GGEES203_dich>8 #eenzaamheid 
                                       | SOURCE_SUBSET$GGRLS202_dich<23 #regie op het leven 
@@ -332,7 +345,7 @@ SOURCE_SUBSET <- SOURCE_SUBSET[ which(SOURCE_SUBSET$GGEES203_dich>8 #eenzaamheid
                                       | SOURCE_SUBSET$score_zw>4) #samenloop
                                 , ]
 
-#remove outcome variables, keep relevant features for the fingerprint
+#remove 'outcome' variables, keep relevant features for the fingerprint
 SOURCE_SUBSET <- subset(SOURCE_SUBSET, select = -c(GGEES203_dich,GGRLS202_dich,GGADS201_dich,KLGGA207_dich,score_zw))
 
 #number of dichotomous features (df)
@@ -341,16 +354,16 @@ pred_df <- ncol(SOURCE_SUBSET)
 #TAG : attach df-value to plot name and -title
 dest.nme.var <- paste0(dest.nme.var,"_df",pred_df)
 
-#draw sample (for evaluation purposes) or limitations computing set-up/size population
+#draw sample (for evaluation purposes) or limitations computing set-up 
 #sample_size <- 100000
-#SOURCE_SUBSET <- SOURCE_SUBSET[sample(nrow(SOURCE), sample_size), 1:pred_df]
+#SOURCE_SUBSET <- SOURCE_SUBSET[sample(nrow(SOURCE_SUBSET), sample_size), 1:pred_df]
 
 head(SOURCE_SUBSET)
 dim(SOURCE_SUBSET)
 
 
 #-------------------------------------------------------------------------------
-#keep track of respondent id in subject group
+#keep track of respondent id within subject group
 
 respondent_id  <- row.names(SOURCE_SUBSET)
 SEQ <- as.data.frame(respondent_id)
@@ -369,16 +382,20 @@ head(SEQ,5)
 sapply(SOURCE_SUBSET, function(x) sum(is.na(x)))
 
 #plot missing data pattern
-md.pattern(SOURCE_SUBSET,plot = T)
+#md.pattern(SOURCE_SUBSET,plot = T)
 
 #remove cases with missing values (don't do this unless there are very good reasons for it)
 #SOURCE_SUBSET <- na.omit(SOURCE_SUBSET)
 
 #missing data imputation
-#method : Multivariate Imputation via Chained Equations, logreg (Logistic Regression) for binary features
+#method : Multivariate Imputation via Chained Equations (MICE), logreg (Logistic Regression) for binary features
+#More info : https://stefvanbuuren.name/mice/
+
+#see methods available
+#methods(mice)
 
 #fluxplot
-#Variables with higher outflux are (potentially) the more powerful.
+#Featuress with higher outflux are (potentially) the more powerful.
 plot.nme = paste0(ggd,'_fluxplot_pattern.png')
 plot.store <-paste0(plots.loc,plot.nme)
 png(filename=plot.store,height = png_height,width = png_height * aspect_ratio)
@@ -386,24 +403,24 @@ fplot <- fluxplot(SOURCE_SUBSET)
 fplot
 dev.off()
 
-#initial run to auto-determine powerful predictors for imputation
+#initial run to auto-determine powerful predictors for imputation, tweak correlation value accordingly
 ini <- mice(SOURCE_SUBSET,pred=quickpred(SOURCE_SUBSET, mincor=.35),seed=500, print=F)
 #predictor matrix
 (pred <- ini$pred)
-
+#save prediction m atrix
 save(pred, file = "prediction_matrix_features.RData")
 
-#or just load a predefined prediction matrix
+#or load a predefined prediction matrix
 #pred <- load("prediction_matrix_features.RData")
 
 #first run (low number of iterations)
+#method: logistic regression for binary features 
 imp_data <- mice(SOURCE_SUBSET,method = "logreg", pred=pred,m=5,maxit=10,seed=500, print=T)
-
 summary(imp_data)
 
 #convergence
+#The mice function implements an iterative Markov Chain Monte Carlo type of algorithm.
 #it is important that convergence takes effect towards the end of the iteration process
-
 plot.nme = paste0(ggd,'_convergence_imputation_iterations_first_run.png')
 plot.store <-paste0(plots.loc,plot.nme)
 png(filename=plot.store,height = png_height,width = png_height * aspect_ratio)
@@ -457,7 +474,7 @@ head(SOURCE_SUBSET,2)
 
 #-------------------------------------------------------------------------------
 # Collinearity
-#low correlation is good
+#high correlation is not desirable (inflated attribution)
 #plot.nme = paste0(ggd,'_correlation_features.png')
 #plot.store <-paste0(plots.loc,plot.nme)
 #png(filename=plot.store,height = png_height,width = png_height * aspect_ratio)
@@ -470,12 +487,31 @@ head(SOURCE_SUBSET,2)
 #-------------------------------------------------------------------------------
 # Outliers
 
+#Why are we interested in outliers? (Extreme) Outliers ('unique' situations) tend 
+#to distort the detection of clear (natural) formations of similar situations.
+#some clustering techniques are more sensitive to extreme outliers than others
+#comparing sensitive and non-sensitive methods provide additional insight about
+#'unique' situations
+
 #Outlier detection for high-dimensional data (Mahalanobis)
-#Calculate Mahalanobis predictor variables
 #Mahalanobis squared distances using the (robust) minimum covariance determinant (MCD)
 mah_df <- SOURCE_SUBSET[,-which(names(SOURCE_SUBSET) %in% c("vulnerable_suspect"))] #list columns which are not features
 m_dist <- mahalanobis(mah_df, colMeans(mah_df), cov(mah_df),method="mcd")
 SOURCE_SUBSET$MD <- round(m_dist, 1)
+
+#density plot Mahalanobis
+plot.title = paste0('Mahalanobis squared distance (outlier detection)')
+mplot <- ggplot(data = SOURCE_SUBSET, mapping = aes(x=MD)) + 
+  geom_histogram(aes(y=..density..),fill="darkblue",color="white",alpha=0.4) + 
+  geom_density() +
+  geom_rug() +
+  ggtitle(plot.title) +
+  labs(x='Mahalanobis distance ') +
+  theme_minimal()
+(mplot)
+plot.nme = paste0(ggd,'_mahalanobis_distance.png')
+plot.store <-paste0(plots.loc,plot.nme)
+ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio,dpi = dpi)
 
 #outliers binned
 md <- SOURCE_SUBSET %>%
@@ -493,13 +529,13 @@ outlier_dis <- ggplot(md, aes(x = md_bin)) +
   geom_bar(aes(fill = md_bin)) 
 
 outlier_dis
-plot.nme = paste0(ggd,'_outliers_distribution.png')
+plot.nme = paste0(ggd,'_mahalanobis_outliers_distribution.png')
 plot.store <-paste0(plots.loc,plot.nme)
 ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio,dpi = dpi)
 
-# Binary outlier variable
+# Binary outlier qualification
 # threshold determined by lower boundary of last valid bin, see outlier distribution plot 
-threshold_zw <- 48.9 # Threshold UTR: 51.5, ZHZ : 54.2 , HvB : 35.1 (higher value means more outliers in scope)
+threshold_zw <- 49.3 # Threshold UTR: 51.5, ZHZ : 54.2 , HvB : 35.1 (higher value means more outliers in scope)
 SOURCE_SUBSET$outlier <- "No"
 SOURCE_SUBSET$outlier[SOURCE_SUBSET$MD > threshold_zw] <- "Yes"  
 
@@ -516,8 +552,7 @@ outlier_dich <- ggplot(md, aes(x = SOURCE_SUBSET$outlier_fac)) +
   guides(fill=guide_legend(title="Level of outlier")) +
   theme_minimal() + 
   geom_bar(aes(fill = md_bin)) +
-  geom_text(aes(label=..count..),stat="count")
-
+  geom_text(aes(label=..count..),stat="count",position=position_dodge(width=0.9), vjust=-0.25)
 outlier_dich
 ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio,dpi = dpi)
 
@@ -525,6 +560,7 @@ save(SOURCE_SUBSET,file=paste0(data.loc,"SOURCE_SUBSET_INC_OUTLIERS",".Rda"))
 
 #store outlier qualifier for later use (after dimension reduction, before clustering)
 outlier_vec <- (SOURCE_SUBSET$outlier=="Yes")
+outlier_df <- as.data.frame(outlier_vec)
 
 #prepare for analysis
 ANALYSIS_SUBSET <- SOURCE_SUBSET
@@ -538,7 +574,7 @@ save(ANALYSIS_SUBSET,file=paste0(data.loc,"ANALYSIS_SUBSET",".Rda"))
 cols.srce.nme <- paste0(data.loc, "analysis-subset-",dest.nme.var, ".csv")
 write.csv(ANALYSIS_SUBSET, file=cols.srce.nme)
 
-#Bartlettas test of sphericity (test for homogeneity of variances) : check if data reduction is possible
+#Bartlettas test of sphericity (test for homogeneity of variances) 
 #significance level must reside well below of 0.05
 bartlett.test(ANALYSIS_SUBSET)
 
@@ -564,9 +600,12 @@ bartlett.test(ANALYSIS_SUBSET)
 #-------------------------------------------------------------------------------
 # I. Dimensionality reduction (DR)
 
-
 #-------------------------------------------------------------------------------
+
 # I.1 T-Distributed Stochastic Neighbor Embedding (TSNE)
+#t-SNE is a non-linear technique for dimensionality reduction 
+#well suited for the visualization of high-dimensional data
+#t-SNE mainly preserves local structure in the data
 
 #reduce features to two dimensions with TSNE
 tsne_model = Rtsne(ANALYSIS_SUBSET, check_duplicates=FALSE, pca=TRUE, perplexity=perplex, theta=0.5, dims=2)
@@ -574,14 +613,14 @@ tsne_model = Rtsne(ANALYSIS_SUBSET, check_duplicates=FALSE, pca=TRUE, perplexity
 #re-attach row id
 tsne = cbind.data.frame(rownames(ANALYSIS_SUBSET),tsne_model$Y)
 colnames(tsne)[0] <- paste(colnames(ANALYSIS_SUBSET)[0])
-remove_rownames(tsne)
+if (has_rownames(tsne)) {remove_rownames(tsne)}
 tsne <- column_to_rownames(tsne, var = "rownames(ANALYSIS_SUBSET)")
 
 colnames(tsne)[1] <- "V1"
 colnames(tsne)[2] <- "V2"
 head(tsne,2)
 
-#plot subject group in a two-dimensional space
+#plot entire subject group in a two-dimensional space
 plot.title = paste0('TSNE cloud ',dest.nme.var)
 ggplot(tsne, aes(x=V1, y=V2)) +  
   geom_point(size=0.25) +
@@ -600,23 +639,73 @@ ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio,d
 
 ## TSNE data subject group
 tsne_sub <- tsne
-## registration of subject group INCLUDING membership of various clustering methods
+## registration of subject group for future cluster membership registration
 tsne_store <- tsne
 
 #Preparation for Kmeans clustering 
-#TSNE of focal group (without outliers / noise)
-#exclude outliers from clustering in case of Kmeans
+#TSNE of focal group (without extreme outliers / noise)
+#exclude extreme outliers from clustering in case of Kmeans
 #Kmeans is sensitive to (strong) outliers
-outlier_df <- as.data.frame(outlier_vec)
+
 tsne_core <- cbind(tsne_sub,outlier_df)
-
-
+#dataframe with just coordinates
 tsne_foc <- tsne_core[outlier_vec==FALSE,]
 tsne_foc <- subset(tsne_foc, select=c(V1,V2))
 rm(tsne_core)
 
 #recap: tsne_sub is the research population (with outliers), tsne_foc is
 #the focal group without the outliers (for Kmeans)
+
+
+#-------------------------------------------------------------------------------
+# I.2 Uniform Manifold Approximation and Projection (UMAP)
+#UMAP is a non linear dimensionality reduction algorithm in the same family as t-SNE.
+#UMAP’s output results in more compact, separated clusters compared to t-SNE.
+#UMAP claims to preserve both local and most of the global structure in the data
+#UMAP is therefore better than to compare the relative position of clusters
+
+umap_model <- umap::umap(ANALYSIS_SUBSET)
+umap_model
+head(umap_model$layout, 3)
+
+umap <-as.data.frame(umap_model$layout)
+colnames(umap)[1] <- "V1"
+colnames(umap)[2] <- "V2"
+head(umap,2)
+#umap <- as.data.frame(umap)
+
+plot.title = paste0('UMAP cloud ',dest.nme.var)
+ggplot(umap, aes(x=V1, y=V2)) +  
+  geom_point(size=0.25) +
+  guides(colour=guide_legend(override.aes=list(size=15))) +
+  xlab("") + ylab("") +
+  ggtitle(plot.title) +
+  theme_light(base_size=20) +
+  theme(axis.text.x=element_blank(),
+        axis.text.y=element_blank()) +
+  theme_void() +
+  scale_colour_brewer(palette = "Set2")
+plot.nme = paste0('umap_raw_',dest.nme.var,'.png')
+plot.store <-paste0(plots.loc,plot.nme)
+ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio,dpi = dpi)
+
+
+## UMAP data subject group
+umap_sub <- umap
+## registration of subject group for future cluster membership registration
+umap_store <- umap
+
+#Preparation for Kmeans clustering 
+#UMAP of focal group (without extreme outliers / noise)
+#exclude extreme outliers from clustering in case of Kmeans
+#Kmeans is sensitive to (strong) outliers
+
+umap_core <- cbind(umap_sub,outlier_df)
+umap_foc <- umap_core[outlier_vec==FALSE,]
+#dataframe with just coordinates
+umap_foc <- subset(umap_foc, select=c(V1,V2))
+rm(umap_core)
+
 
 #-------------------------------------------------------------------------------
 # II. Dimension Reduction (DR) > Clustering (CL)
@@ -664,31 +753,32 @@ ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio,d
 #reset k?
 
 
-
 #-------------------------------------------------------------------------------
-# II.1 TSNE (DR) > kmeans (CL)
+# II.1.1 TSNE (DR) > kmeans (CL)
 
 #NB: as kmeans is prone to outliers we use the focal group here (cases excluding outliers). 
-#we cluster the focal group cases and plot the outliers as 0
-#later we associate outliers to it's position to the dominant cluster
+#we cluster the focal group cases and plot the outliers as cases with qualidier '0'
 
 #the trick is to accommodate as much outliers as possible untill the point that it gets too
-#difficult for Kmeans to converge: adjust outlier threshold accordingly !!
-#the group of outliers that cannot be associated with a K-means cluster may need special attention
-#in policy and intervention efforts.
+#difficult for the Kmeans algorithm to converge: adjust outlier threshold accordingly !!
+#the group of outliers that are very difficult to associate with a K-means cluster may need 
+#special attention in policy and intervention efforts.
 #especially when outliers are near (or 'in') multi-problem or highly vulnerable clusters 
 
-#working tsne for kmeans (focus group)
+#working version of TSNE for kmeans (focus group)
 tsne_km <- tsne_foc
 
 ## Creating k-means clustering model
-fit_cluster_kmeans=kmeans(scale(tsne_km), k,iter.max = 1000,algorithm = c("Forgy"))  
+fit_tsne_kmeans=kmeans(scale(tsne_km), k,iter.max = 1000,algorithm = c("Forgy"))  
+
+#summary of model-level statistics
+glance(fit_tsne_kmeans) %>% glimpse()
 
 #cluster membership distribution
-fit_cluster_kmeans$size	
+fit_tsne_kmeans$size	
 
-#add clustermemberschip to Tsne (focal) dataframe
-tsne_km$cl_kmeans <- as.factor(fit_cluster_kmeans$cluster)
+#add clustermemberschip to TSNE (focal group) dataframe
+tsne_km$tsne_cl_kmeans <- as.factor(fit_tsne_kmeans$cluster)
 
 #tsne_sub$repondent_id <- row.names(tsne_sub) 
 #merge focal group with research group
@@ -698,17 +788,20 @@ tsne_km_ext <- merge(tsne_sub, tsne_km, left_index=True, right_index=True,all=TR
 #tsne_km_ext <- fr[,3:5]
 #rm(fr)
 
-tsne_km_ext$cl_kmeans <- fct_explicit_na(tsne_km_ext$cl_kmeans, "0")
+tsne_km_ext$tsne_cl_kmeans <- fct_explicit_na(tsne_km_ext$tsne_cl_kmeans, "0")
 head(tsne_km_ext,2)
 
-#just in case
-tsne_km_ext$V1 <- as.numeric(as.character(tsne_km_ext$V1))
-tsne_km_ext$V2 <- as.numeric(as.character(tsne_km_ext$V2))
+#tsne_km_ext$V1 <- as.numeric(as.character(tsne_km_ext$V1))
+#tsne_km_ext$V2 <- as.numeric(as.character(tsne_km_ext$V2))
+#dichotomize outliers
+tsne_km_ext$outlier <-0
+tsne_km_ext$outlier[tsne_km_ext$tsne_cl_kmeans==0] <-1
+tsne_km_ext$outlier<-as.factor(tsne_km_ext$outlier)
 
 ## plotting the results with Kmeans clustering
 plot.title = paste0('TSNE > Kmeans of ',dest.nme.var, ' k=',k,' perplexity=',perplex)
-ggplot(tsne_km_ext, aes(V1, V2, color = cl_kmeans)) +
-  geom_point() + 
+tsne_plot <- ggplot(tsne_km_ext, aes(V1, V2, color = tsne_cl_kmeans, shape=outlier)) +
+  geom_point() +
   ggtitle(plot.title) +
   theme_minimal() +
   xlab('') +
@@ -716,21 +809,24 @@ ggplot(tsne_km_ext, aes(V1, V2, color = cl_kmeans)) +
   #geom_text(aes(label=row.names(X)),color="#ababab") +
   scale_colour_manual(name = "cluster",values=colors_cust) + 
   geom_text(aes(label = ""), size = 3, vjust = 1, color = "black")
+
+tsne_plot + scale_shape_discrete(name = "outlier",   breaks=c("0", "1"), labels = c("no", "yes")) 
+
 plot.nme = paste0('tsne_kmeans_',dest.nme.var,'_k',k,'_p',perplex,'.png')
 plot.store <-paste0(plots.loc,plot.nme)
 ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio,dpi = dpi)
 
-km_cl <- merge(tsne_store, tsne_km, by=0, all.x=T, keep=F)
-row.names(km_cl) <- km_cl[,1]
+tsne_km_cl <- merge(tsne_store, tsne_km, by=0, all.x=T, keep=F)
+row.names(tsne_km_cl) <- tsne_km_cl[,1]
 
-#add clustermemberschip to Tsne dataframe
-tsne_store$cl_kmeans <- km_cl$cl_kmeans 
-rm(km_cl)
+#add clustermemberschip to TSNE dataframe
+tsne_store$tsne_cl_kmeans <- tsne_km_cl$tsne_cl_kmeans 
+rm(tsne_km_cl)
 
 #-------------------------------------------------------------------------------
-# II.2 TSNE (DR) > K-medoids clustering  / partition around mediods PAM (CL)
+# II.1.2 TSNE (DR) > K-medoids clustering  / partition around mediods PAM (CL)
 
-# less prone to outliers, therefore we use the subject group (incl outliers)
+# less prone to outliers, therefore we use the entire subject group (incl outliers)
 
 pam_res <- pam(tsne_sub, k)
 
@@ -741,15 +837,14 @@ fviz_cluster(pam_res, geom = "point", ellipse.type = "convex") +
   labs(title = title)
 ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio,dpi = dpi)
 
-#add clustermemberschip to Tsne dataframe
-tsne_store$cl_pam <- pam_res$clustering
+#add clustermemberschip to TSNE subject group dataframe
+tsne_store$tsne_cl_pam <- as.factor(pam_res$clustering)
 
 #-------------------------------------------------------------------------------
-# II.3 TSNE (DR) > hierarchical clustering (CL)
+# II.1.3 TSNE (DR) > hierarchical clustering (CL)
 ## Creating hierarchical cluster model, and assigning the result to the data used to create the tsne
 
-#We use the Euclidean distance as distance metrics, and use 
-#Ward's minimum variance method to perform agglomerative clustering.
+#Euclidean distance and Ward's minimum variance method to perform agglomerative clustering
 
 plot.nme = paste0('tsne_hca_colors_',dest.nme.var,'_k',k,'.png')
 plot.store <-paste0(plots.loc,plot.nme)
@@ -777,26 +872,105 @@ dev.off()
 #diana(gower_dist, metric = "euclidean", stand = FALSE)
 
 #add clustermemberschip to Tsne dataframe
-tsne_store$cl_hierarchical = as.factor(factor(cutree(fit_hca_tsne, k=k))) 
+tsne_store$tsne_cl_hierarchical = as.factor(factor(cutree(fit_hca_tsne, k=k))) 
 #as.data.frame(tsne_original)
 
+#done with clustering methods on TSNE!
 head(tsne_store,2)
 
 
 #-------------------------------------------------------------------------------
-# POST PROCESSING
+# II.2 UMAP (DR) > kmeans (CL)
 
-#mark outliers
-tsne_store$outlier <- 0 
-tsne_store$outlier[is.na(tsne_store$cl_kmeans)] <-1
+#NB: as kmeans is prone to outliers we use the focal group here (cases excluding outliers). 
+#we cluster the focal group cases and plot the outliers as cases with qualidier '0'
 
-#reattach index to dataframe
-tsne_store$respondent_id <- as.factor(row.names(tsne_store)) 
-tsne_store$volgnummer <- gsub("x","",as.character(tsne_store$respondent_id))
-head(tsne_store)
+#working UMAP for kmeans (focus group)
+umap_km <- umap_foc
+
+## Creating k-means clustering model
+fit_umap_kmeans=kmeans(scale(umap_km), k,iter.max = 1000,algorithm = c("Forgy"))  
+
+#summary of model-level statistics
+glance(fit_umap_kmeans) %>% glimpse()
+
+#cluster membership distribution
+fit_umap_kmeans$size	
+
+#add clustermemberschip to UMAP (focal) dataframe
+umap_km$umap_cl_kmeans <- as.factor(fit_umap_kmeans$cluster)
+
+#merge focal group with research group
+umap_km_ext <- merge(umap_sub, umap_km, left_index=True, right_index=True,all=TRUE)
+
+
+umap_km_ext$umap_cl_kmeans <- fct_explicit_na(umap_km_ext$umap_cl_kmeans, "0")
+head(umap_km_ext,2)
+
+umap_km_ext$outlier <-0
+umap_km_ext$outlier[umap_km_ext$umap_cl_kmeans==0] <-1
+umap_km_ext$outlier<-as.factor(umap_km_ext$outlier)
+
+
+## plotting the results with Kmeans clustering
+plot.title = paste0('UMAP > Kmeans of ',dest.nme.var, ' k=',k)
+umap_plot <- ggplot(umap_km_ext, aes(V1, V2, color = umap_cl_kmeans, shape=outlier)) +
+  geom_point() + 
+  ggtitle(plot.title) +
+  theme_minimal() +
+  xlab('') +
+  ylab('') +
+  #geom_text(aes(label=row.names(X)),color="#ababab") +
+  scale_colour_manual(name = "cluster",values=colors_cust) + 
+  geom_text(aes(label = ""), size = 3, vjust = 1, color = "black")
+
+umap_plot + scale_shape_discrete(name = "outlier",   breaks=c("0", "1"), labels = c("no", "yes"))
+
+plot.nme = paste0('umap_kmeans_',dest.nme.var,'_k.png')
+plot.store <-paste0(plots.loc,plot.nme)
+ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio,dpi = dpi)
+
+
+umap_km_cl <- merge(umap_store, umap_km, by=0, all.x=T, keep=F)
+row.names(umap_km_cl) <- umap_km_cl[,1]
+
+#add clustermemberschip to UMAP dataframe
+umap_store$umap_cl_kmeans <- umap_km_cl$umap_cl_kmeans 
 
 #-------------------------------------------------------------------------------
-# Compare cluster methods
+# POST PROCESSING
+
+#TSNE dataframe
+#reattach index to dataframe
+tsne_store$respondent_id <- as.factor(row.names(tsne_store)) 
+
+names(tsne_store)[names(tsne_store) == "V1"] <- "tsne_coord_x1"
+names(tsne_store)[names(tsne_store) == "V2"] <- "tsne_coord_x2"
+head(tsne_store)
+
+
+#UMAP dataframe
+#reattach index to dataframe
+umap_store$respondent_id <- as.factor(row.names(umap_store)) 
+
+names(umap_store)[names(umap_store) == "V1"] <- "umap_coord_x1"
+names(umap_store)[names(umap_store) == "V2"] <- "umap_coord_x2"
+head(umap_store)
+
+
+final_store <- merge(tsne_store,umap_store,by="respondent_id")
+final_store$volgnummer <- gsub("x","",as.character(final_store$respondent_id))
+
+#mark outliers
+final_store$outlier <- 0 
+final_store$outlier[is.na(final_store$tsne_cl_kmeans)] <-1
+
+
+
+#-------------------------------------------------------------------------------
+# Compare TSNE cluster methods
+
+#-------------------------------------------------------------------------------
 
 #within.cluster.ss measurement shows how closely related objects are in 
 #clusters; the smaller the value, the more closely related are observations within the cluster
@@ -804,60 +978,62 @@ head(tsne_store)
 #avg.silwidth is a measurement that considers how closely related objects 
 #are within the cluster and how clusters are separated from each other.
 
-#Kmeans 
 ANALYSIS_SUBSET_km <- cbind(ANALYSIS_SUBSET,outlier_df)
 ANALYSIS_SUBSET_km <- ANALYSIS_SUBSET_km[outlier_vec==FALSE,]
 
-cs1 = cluster.stats(dist(ANALYSIS_SUBSET_km),as.numeric(tsne_km$cl_kmeans))
-silwidth_kmeans <- cs1[c("within.cluster.ss","avg.silwidth")]
-silwidth_kmeans
+#Kmeans on TSNE
+cs1_1 = cluster.stats(dist(ANALYSIS_SUBSET_km),as.numeric(tsne_km$tsne_cl_kmeans))
+(silwidth_kmeans_tsne <- cs1_1[c("within.cluster.ss","avg.silwidth")])
 
-#PAM
-cs2 = cluster.stats(dist(ANALYSIS_SUBSET),as.numeric(tsne_store$cl_pam))
-silwidth_pam <- cs2[c("within.cluster.ss","avg.silwidth")]
-silwidth_pam
 
-#HCA 
-cs3 = cluster.stats(dist(ANALYSIS_SUBSET),as.numeric(tsne_store$cl_hierarchical))
-silwidth_hca <- cs3[c("within.cluster.ss","avg.silwidth")]
-silwidth_hca
+#Kmeans on UMAP
+cs1_2 = cluster.stats(dist(ANALYSIS_SUBSET_km),as.numeric(umap_km$umap_cl_kmeans))
+(silwidth_kmeans_umap <- cs1_2[c("within.cluster.ss","avg.silwidth")])
 
-silwidth <- rbind(silwidth_kmeans,silwidth_pam,silwidth_hca)
 
-silwidth <- as.data.frame(silwidth)
-silwidth
+#PAM on TSNE
+cs2 = cluster.stats(dist(ANALYSIS_SUBSET),as.numeric(tsne_store$tsne_cl_pam))
+(silwidth_pam_tsne <- cs2[c("within.cluster.ss","avg.silwidth")])
+
+
+#HCA on TSNE
+cs3 = cluster.stats(dist(ANALYSIS_SUBSET),as.numeric(tsne_store$tsne_cl_hierarchical))
+(silwidth_hca_tsne <- cs3[c("within.cluster.ss","avg.silwidth")])
+
+
+(silwidth <- as.data.frame(rbind(silwidth_kmeans_tsne,silwidth_kmeans_umap,silwidth_pam_tsne,silwidth_hca_tsne)))
 
 silwidth$within.cluster.ss <- as.numeric(silwidth$within.cluster.ss) 
 silwidth$methods <- row.names(silwidth)
 silwidth$methods <- as.factor(silwidth$methods)  
-#Plot outlier distribution by bin 
+
+#Plot consistency of observations within cluster 
 plot.title = paste0('Measurement of consistency observations within cluster')
 plot.nme = paste0(ggd,'_within_cluster_ss.png')
 plot.store <-paste0(plots.loc,plot.nme)
 cluster_ss <- ggplot(silwidth, aes(x=methods, y = within.cluster.ss)) +
   ggtitle(plot.title) +
   labs(x = "Clustering method", y = "Within.cluster.ss (lower is better)") +
-  geom_boxplot() 
+  geom_boxplot()
 cluster_ss
 ggsave(plot.store, height = graph_height , width = graph_height * aspect_ratio,dpi = dpi)
 
 #evaluation of the similarity between two clusterings
 #cl_kmeans versus cl_pam
-rep <- 10000
-FM_index_H0 <- replicate(rep, FM_index_permutation(tsne_store$cl_pam, tsne_store$cl_kmeans)) 
-plot(density(FM_index_H0), main = "FM Index distribution under H0\n (10000 permutation), PAM vs Kmeans")
-abline(v = mean(FM_index_H0), col = 1, lty = 2)
+#rep <- 10000
+#FM_index_H0 <- replicate(rep, FM_index_permutation(tsne_store$tsne_cl_pam, tsne_store$tsne_cl_kmeans)) 
+#plot(density(FM_index_H0), main = "FM Index distribution under H0\n (10000 permutation), PAM vs Kmeans")
+#abline(v = mean(FM_index_H0), col = 1, lty = 2)
 
-skew(FM_index_H0) 
-kurtosi(FM_index_H0)
-
+#skew(FM_index_H0) 
+#kurtosi(FM_index_H0)
 
 
 #-------------------------------------------------------------------------------
 # Writing cluster membership to csv
 
 cluster_membership_name <- paste0(data.loc,"cluster-membership-",dest.nme.var,"-k",k,"-p",perplex,".csv")
-write.csv(tsne_store, file=cluster_membership_name,row.names=TRUE)
+write.csv(final_store, file=cluster_membership_name,row.names=TRUE)
 
 #-------------------------------------------------------------------------------
 # merging and writing all data
@@ -868,18 +1044,21 @@ ZW <- data.frame(score_zw)
 ZW$volgnummer <- row.names(ZW)
 ZW$volgnummer <- gsub("x","",ZW$volgnummer)
 z<- NULL
-y <- merge(SOURCE_ENRICHED, tsne_store,all=T, by='volgnummer')
+y <- merge(SOURCE_ENRICHED, final_store,all=T, by='volgnummer')
 z <- merge(y,ZW,all=T, by='volgnummer')
 rm(y)
 
-#dichotomize clustermembership Kmeans per clusters into new variables
+#dichotomize clustermembership Kmeans (resp. TSNE,UMAP) per clusters into new variables
 for (cluster in 1:k){
-  col = sprintf("kmeans_clus%d", cluster)
-  z[col] = as.integer(as.logical(z$cl_kmeans == cluster))
+  tsne_km_var = sprintf("tsne_kmeans_clus%d", cluster)
+  z[tsne_km_var] = as.integer(as.logical(z$tsne_cl_kmeans == cluster))
+  
+  uamp_km_var = sprintf("umap_kmeans_clus%d", cluster)
+  z[uamp_km_var] = as.integer(as.logical(z$umap_cl_kmeans == cluster))
 }
 
 #dichotomize vulnerability
-z$vulnerable <- as.integer(as.logical(as.integer(z$cl_pam)>0))
+z$vulnerable <- as.integer(as.logical(as.integer(z$tsne_cl_pam)>0))
 z$vulnerable[is.na(z$vulnerable)] <- 0
 
 #clean NA notations

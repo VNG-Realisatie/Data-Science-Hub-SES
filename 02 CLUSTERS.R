@@ -7,7 +7,7 @@
 # requirements: R Statistics version  (3.60=<)
 # author : Mark Henry Gremmen, in cooperation with Gemma Smulders (GGD HvB), Ester de Jonge (GGD ZHZ)
 # DataScienceHub @ JADS, GGD Hart voor Brabant, GGD Zuid-Holland Zuid
-# lud 2020-02-20
+# lud 2020-03-23
 #-------------------------------------------------------------------------------
 
 #clear environment
@@ -15,6 +15,8 @@ rm(list=ls())
 
 #clear console
 cat("\014")  
+
+packrat::init()
 
 #packages
 packages <- c("tools","here","tidyverse","naniar", "haven", "mice","VIM", "corrplot", "car", "nFactors", "psych", "caret", 
@@ -48,12 +50,12 @@ data.loc <- paste0(root,'/DATA/',ggd,'/')
 
 #options
 set.seed(123)  # for reproducibility
-options(digits=20)
+options(digits=15)
 
 #number of clusters (Kmeans, Hierarchical Cluster Analysis) 
 #always (re)check the optimal number of clusters!!!
 #see DIMENSION.R section II. 'Optimal number of clusters'
-k <- 8
+k <- 9
 
 #number of factors (PCA)
 f <- 4
@@ -88,9 +90,7 @@ clustering <- "kmeans"
 # WEIGHT
 
 #weight variable 
-z$case_wei <- z$ewGGD
-#in case it is a factor
-z$case_wei <- as.numeric(as.character(z$case_wei))
+z$case_wei <- as.numeric(as.character(z$ewGGD))
 #disable weight
 #z$case_wei <- 1
 
@@ -723,7 +723,7 @@ sit[] <- lapply(sit, function(x) {
 
 sit[sit == 9] <- NA
 
-#cluster member in kmeans method
+#cluster member in PAM method
 sit <- sit[ which(sit$cl_pam>0), ]
 
 
